@@ -1,0 +1,16 @@
+LICENSE
+README.md
+pyproject.toml
+setup.cfg
+src/ellipticity/__init__.py
+src/ellipticity/main.py
+src/ellipticity/tools.py
+src/ellipticity/epsilon/epsilon_ak135.txt
+src/ellipticity/epsilon/epsilon_iasp91.txt
+src/ellipticity/epsilon/epsilon_mars1.txt
+src/ellipticity/epsilon/epsilon_prem.txt
+src/example_ellipticity.egg-info/PKG-INFO
+src/example_ellipticity.egg-info/SOURCES.txt
+src/example_ellipticity.egg-info/dependency_links.txt
+src/example_ellipticity.egg-info/requires.txt
+src/example_ellipticity.egg-info/top_level.txt
