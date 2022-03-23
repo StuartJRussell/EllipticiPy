@@ -17,7 +17,6 @@ import obspy
 import warnings
 import numpy as np
 from obspy.taup import TauPyModel
-from scipy.integrate import trapz
 
 # ---------------------------------------------------------------------------
 # Suppress warnings
@@ -639,7 +638,7 @@ def calculate_coefficients(arrival, model, lod):
             }
             # Do the integration
             seg_ray_sigma[x] = {
-                m: np.sum(trapz((eta**3.0) * dvdr * epsilon * lamda[m], x=dist) / p)
+                m: np.sum(np.trapz((eta**3.0) * dvdr * epsilon * lamda[m], x=dist) / p)
                 for m in [0, 1, 2]
             }
 
@@ -948,8 +947,6 @@ def calculate_model_epsilon(model, filename, lod, taper=True):
         text file of epsilon values with radius
     """
 
-    from numpy import inf
-
     # Angular velocity of model
     Omega = 2 * np.pi / lod
 
@@ -1003,8 +1000,8 @@ def calculate_model_epsilon(model, filename, lod, taper=True):
 
     # Solve the differential equation
     LHS = dr * eta / r
-    if -inf in LHS:
-        LHS[LHS == -inf] = 0
+    if -np.inf in LHS:
+        LHS[LHS == -np.inf] = 0
     LHS = np.cumsum(np.nan_to_num(LHS))
     LHS = np.exp(LHS)
     c = epsilona / LHS[-1]
