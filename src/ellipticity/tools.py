@@ -92,7 +92,7 @@ def alp2(m, x):
     if m == 0:
         out = 0.5 * (3.0 * np.cos(x) ** 2.0 - 1.0)
     elif m == 1:
-        out = (3.0) * np.cos(x) * np.sin(x)
+        out = 3.0 * np.cos(x) * np.sin(x)
     elif m == 2:
         out = 3.0 * np.sin(x) ** 2.0
 

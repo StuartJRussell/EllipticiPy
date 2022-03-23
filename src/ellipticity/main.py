@@ -15,7 +15,7 @@ import obspy
 import warnings
 import numpy as np
 from obspy.taup import TauPyModel
-from .tools import *
+from .tools import calculate_coefficients, list_coefficients, alp2, factor
 
 # ---------------------------------------------------------------------------
 # Suppress warnings
