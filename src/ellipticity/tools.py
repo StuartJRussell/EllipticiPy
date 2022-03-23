@@ -14,14 +14,14 @@ in the main file.
 #Import modules
 import os
 import obspy
-import scipy
 import warnings
 import numpy as np
 from obspy.taup import TauPyModel
+from scipy.integrate import trapz
 # ---------------------------------------------------------------------------
 #Suppress warnings
 warnings.filterwarnings('ignore', category = RuntimeWarning)
-warnings.filterwarnings('ignore', message = 'Resizing a TaP array inplace failed due to the existence of other references to the array, creating a new array. See Obspy #2280.')
+warnings.filterwarnings('ignore', message = 'Resizing a TauP array inplace failed due to the existence of other references to the array, creating a new array. See Obspy #2280.')
 # ---------------------------------------------------------------------------
 
 #Define Exceptions       
@@ -132,12 +132,13 @@ def get_model_epsilon(model, lod):
     Output:
         adds arrays of epsilon and radius to the model instance as attributes.
     '''
-    
+
     #Get velocity model name
-    if "'" in model.model.s_mod.v_mod.model_name:
-        vel_model = model.model.s_mod.v_mod.model_name.split("'")[1]
+    vel_model_name = str(model.model.s_mod.v_mod.model_name)
+    if "'" in vel_model_name:
+        vel_model = vel_model_name.split("'")[1]
     else:
-        vel_model = model.model.s_mod.v_mod.model_name
+        vel_model = vel_model_name
     
     #See if epsilon values are already calculated and if not then inform the user
     e_file = '/'.join(__file__.split('/')[:-1]) + '/epsilon/epsilon_' + vel_model.split('/')[-1].split('.')[0] + '.txt'
@@ -179,10 +180,11 @@ def get_taup_arrival(phase, distance, source_depth, arrival_index, model):
     arrivals = model.get_ray_paths(source_depth_in_km = source_depth, distance_in_degree = distance, phase_list = [phase], receiver_depth_in_km = 0.)
     arrivals = [x for x in arrivals if abs(x.purist_distance - distance) < 0.0001]
     if len(arrivals) == 0:
-        if "'" in model.model.s_mod.v_mod.model_name:
-            vel_model = model.model.s_mod.v_mod.model_name.split("'")[1]
+        vel_model_name = str(model.model.s_mod.v_mod.model_name)
+        if "'" in vel_model_name:
+            vel_model = vel_model_name.split("'")[1]
         else:
-            vel_model = model.model.s_mod.v_mod.model_name
+            vel_model = vel_model_name
         raise PhaseError(phase, vel_model)
     
     return arrivals[arrival_index]
@@ -519,7 +521,7 @@ def calculate_coefficients(arrival, model, lod):
             #lambda
             lamda = {x:factor(x)*(-1.)*(2./3.)*alp2(x, dist) for x in [0, 1, 2]}
             #Do the integration
-            seg_ray_sigma[x] = {m:np.sum(scipy.integrate.trapz((eta**3.)*dvdr*epsilon*lamda[m], x = dist)/p) for m in [0, 1, 2]}
+            seg_ray_sigma[x] = {m:np.sum(trapz((eta**3.)*dvdr*epsilon*lamda[m], x = dist)/p) for m in [0, 1, 2]}
             
         #Sum coefficients for each segment to get total ray path contribution
         ray_sigma = {m:np.sum([seg_ray_sigma[x][m] for x in paths]) for m in [0, 1, 2]}

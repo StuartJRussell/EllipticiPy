@@ -11,7 +11,6 @@ ellipticity correction for a seismic ray path in a given model.
 '''
 # ---------------------------------------------------------------------------
 #Import modules
-import scipy
 import obspy
 import warnings
 import numpy as np
@@ -20,7 +19,7 @@ from .tools import *
 # ---------------------------------------------------------------------------
 #Suppress warnings
 warnings.filterwarnings('ignore', category = RuntimeWarning)
-warnings.filterwarnings('ignore', message = 'Resizing a TaP array inplace failed due to the existence of other references to the array, creating a new array. See Obspy #2280.')
+warnings.filterwarnings('ignore', message = 'Resizing a TauP array inplace failed due to the existence of other references to the array, creating a new array. See Obspy #2280.')
 # ---------------------------------------------------------------------------
 
 
