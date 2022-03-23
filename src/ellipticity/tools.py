@@ -463,10 +463,11 @@ def calculate_coefficients(arrival, model, lod):
         raise TypeError("Velocity model not correct type")
 
     # Name of model
-    if "'" in model.model.s_mod.v_mod.model_name:
-        vel_model = model.model.s_mod.v_mod.model_name.split("'")[1]
+    vel_model_name = str(model.model.s_mod.v_mod.model_name)
+    if "'" in vel_model_name:
+        vel_model = vel_model_name.split("'")[1]
     else:
-        vel_model = model.model.s_mod.v_mod.model_name
+        vel_model = vel_model_name
 
     # Calculate dv/dr if it doesn't already exist
     if not hasattr(model.model.s_mod.v_mod, "dvdr"):
