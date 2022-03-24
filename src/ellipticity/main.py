@@ -46,6 +46,14 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod = 86164.0
         float, ellipticity correction in seconds
     """
 
+    #Enforce that event latitude must be in range -90 to 90 degrees
+    if not -90 <= source_latitude <= 90:
+        raise ValueError("Source latitude must be in range -90 to 90 degrees")
+        
+    #Enforce that azimuth must be in range 0 to 360 degrees
+    if not 0 <= azimuth <= 360:
+        raise ValueError("Azimuth must be in range 0 to 360 degrees")
+        
     # Assess whether input is arrival or coefficients
     if type(arrival) == obspy.taup.helper_classes.Arrival or (
         type(arrival) == list and len(arrival) == 4 and type(arrival[0]) == str
@@ -72,7 +80,7 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod = 86164.0
 
     else:
         raise TypeError("Arrival/Coefficients not correctly defined")
-
+    
     # Convert azimuth to radians
     az = np.radians(azimuth)
 
