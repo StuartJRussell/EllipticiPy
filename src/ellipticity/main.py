@@ -26,8 +26,7 @@ warnings.filterwarnings(
 )
 # ---------------------------------------------------------------------------
 
-
-def calculate_correction(arrival, azimuth, source_latitude, model, **kwargs):
+def calculate_correction(arrival, azimuth, source_latitude, model, lod = 86164.0905):
     """
     Returns the ellipticity correction to be added to a 1D traveltime for a given ray path in a 1D velocity model.
 
@@ -53,9 +52,6 @@ def calculate_correction(arrival, azimuth, source_latitude, model, **kwargs):
         type(arrival) == list and len(arrival) == 4 and type(arrival[0]) == str
     ):
 
-        # Get the length of day of the model if specified, or return Earth values
-        lod = kwargs.get("lod", 86164.0905)
-
         # Get the coefficients
         sigma = [calculate_coefficients(arrival, model, lod)]
 
@@ -63,9 +59,6 @@ def calculate_correction(arrival, azimuth, source_latitude, model, **kwargs):
     elif type(arrival) == obspy.taup.tau.Arrivals or (
         type(arrival) == list and type(arrival[0]) == obspy.taup.helper_classes.Arrival
     ):
-
-        # Get the length of day of the model if specified, or return Earth values
-        lod = kwargs.get("lod", 86164.0905)
 
         # Get coefficients for each entry in the list
         sigma = list_coefficients(arrival, model, lod)

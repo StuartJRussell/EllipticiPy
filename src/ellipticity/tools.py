@@ -157,51 +157,82 @@ def calculate_model_dvdr(model):
     )
 
 
-def get_model_epsilon(model, lod):
+def get_model_epsilon(model, lod, taper = True):
     """
-    Get the values of epsilon with radius from a pre-written file, or calculates if the file doesn't exist.
+    Calculates a profile of ellipticity of figure (epsilon) through a planetary model.
 
     Inputs:
         model - TauPyModel
-        lod - float, length of day of the model in seconds. Only needed if this the first time that a model is used.
-
+        lod - float, length of day in the model in seconds
+        taper - bool, whether to taper below ICB or not. Causes problems if False (and True is consistent with previous works, e.g. Bullen & Haddon (1973))
+        
     Output:
         adds arrays of epsilon and radius to the model instance as attributes.
     """
 
-    # Get velocity model name
-    vel_model_name = str(model.model.s_mod.v_mod.model_name)
-    if "'" in vel_model_name:
-        vel_model = vel_model_name.split("'")[1]
-    else:
-        vel_model = vel_model_name
+    # Angular velocity of model
+    Omega = 2 * np.pi / lod
 
-    # See if epsilon values are already calculated and if not then inform the user
-    e_file = (
-        "/".join(__file__.split("/")[:-1])
-        + "/epsilon/epsilon_"
-        + vel_model.split("/")[-1].split(".")[0]
-        + ".txt"
+    # Universal gravitational constant
+    G = 6.67408 * 10 ** (-11)
+
+    # Radius of Earth
+    a = model.model.radius_of_planet * 1e3
+
+    # Loop over r and calculate the total mass of the body in kg and moment of inertia
+    # Radius steps in m
+    dr = 100
+    r = np.arange(0, a + dr, dr)
+
+    # Get the density at these depths
+    rho = np.append(
+        model.model.s_mod.v_mod.evaluate_above((a - r[:-1]) / 1000.0, "d") * 1000.0,
+        model.model.s_mod.v_mod.evaluate_below(0.0, "d")[0] * 1000.0,
     )
-    if not os.path.exists(e_file):
-        print("Epsilon not calculated for this model. Calculating...")
-        # Warn user if assuming Earth length of day
-        if lod == 86164.0905:
-            warnings.warn(
-                "Assuming Earth value of length of day for epsilon calculation."
-            )
-        # Calculate epsilon
-        calculate_model_epsilon(model, e_file, lod)
 
-    # Get the values of epsilon for this model from the file
-    f = open(e_file, "r")
-    epsilon_list = [[float(y) for y in x.strip().split(",")] for x in f.readlines()]
-    epsilon_r = np.array([x[0] for x in epsilon_list])
-    epsilon_list = np.array([x[1] for x in epsilon_list])
-    f.close()
+    # Mass within each spherical shell
+    Mr = np.cumsum(4 * np.pi * rho * (r**2) * dr)
 
-    model.model.s_mod.v_mod.epsilon_r = epsilon_r
-    model.model.s_mod.v_mod.epsilon = epsilon_list
+    # Total mass of body
+    M = Mr[-1]
+
+    # Moment of inertia of each spherical shell
+    Ir = (8.0 / 3.0) * np.pi * np.cumsum(rho * (r**4) * dr)
+
+    # Moment of inertia at surface
+    I = Ir[-1]
+
+    # Calculate y (moment of inertia factor) for surfaces within the body
+    y = Ir / (Mr * r**2)
+
+    # Taper if required
+    # Taper at closest point to 0.4, this is where eta is 0
+    # Otherwise epsilon tends to infinity at the centre of the planet
+    if taper:
+        y = np.array([x if x < 0.4 else 0.4 for x in y])
+
+    # Calculate Radau's parameter
+    eta = 6.25 * (1 - 3 * (y) / 2) ** 2 - 1
+
+    # Calculate h
+    # Ratio of centrifugal force and gravity for a particle on the equator at the surface
+    ha = (a**3 * Omega**2) / (G * M)
+
+    # epsilon at surface
+    epsilona = (5 * ha) / (2 * eta[-1] + 4)
+
+    # Solve the differential equation
+    LHS = dr * eta / r
+    if -np.inf in LHS:
+        LHS[LHS == -np.inf] = 0
+    LHS = np.cumsum(np.nan_to_num(LHS))
+    LHS = np.exp(LHS)
+    c = epsilona / LHS[-1]
+    epsilon = c * LHS
+    
+    #Output as model attributes
+    model.model.s_mod.v_mod.epsilon_r = r
+    model.model.s_mod.v_mod.epsilon = epsilon
 
 
 def get_taup_arrival(phase, distance, source_depth, arrival_index, model):
@@ -304,6 +335,7 @@ def centre_of_planet_coefficients(arrival, model):
 
 
 def list_coefficients(arrival, model, lod):
+
     # Get a correction for each arrival
     coeffs = [calculate_coefficients(arr, model, lod=lod) for arr in arrival]
 
@@ -931,87 +963,3 @@ def calculate_coefficients(arrival, model, lod):
         sigma = [ray_sigma[x] + disc_sigma[x] for x in [0, 1, 2]]
 
     return sigma
-
-
-def calculate_model_epsilon(model, filename, lod, taper=True):
-
-    """
-    Calculates a profile of ellipticity (epsilon) through an inputted planetary model.
-
-    Inputs:
-        model - TauPyModel
-        filename - string, output file name
-        lod - float, length of day in the model in seconds
-        taper - bool, whether to taper below ICB or not. Causes problems if False (and True is consistent with previous works, e.g. Bullen & Haddon (1973))
-
-    Output:
-        text file of epsilon values with radius
-    """
-
-    # Angular velocity of model
-    Omega = 2 * np.pi / lod
-
-    # Universal gravitational constant
-    G = 6.67408 * 10 ** (-11)
-
-    # Radius of Earth
-    a = model.model.radius_of_planet * 1000
-
-    # Loop over r and calculate the total mass of the body in kg and moment of inertia
-    # Radius steps in m
-    dr = 100
-    r = np.arange(0, a + dr, dr)
-
-    # Get the density at these depths
-    rho = np.append(
-        model.model.s_mod.v_mod.evaluate_above((a - r[:-1]) / 1000.0, "d") * 1000.0,
-        model.model.s_mod.v_mod.evaluate_below(0.0, "d")[0] * 1000.0,
-    )
-
-    # Mass within each spherical shell
-    Mr = np.cumsum(4 * np.pi * rho * (r**2) * dr)
-
-    # Total mass of body
-    M = Mr[-1]
-
-    # Moment of inertia of each spherical shell
-    Ir = (8.0 / 3.0) * np.pi * np.cumsum(rho * (r**4) * dr)
-
-    # Moment of inertia at surface
-    I = Ir[-1]
-
-    # Calculate y (moment of inertia factor) for surfaces within the body
-    y = Ir / (Mr * r**2)
-
-    # Taper if required
-    # Taper at closest point to 0.4, this is where eta is 0
-    # Otherwise epsilon tends to infinity at the centre of the planet
-    if taper:
-        y = np.array([x if x < 0.4 else 0.4 for x in y])
-
-    # Calculate Radau's parameter
-    eta = 6.25 * (1 - 3 * (y) / 2) ** 2 - 1
-
-    # Calculate h
-    # Ratio of centrifugal force and gravity for a particle on the equator at the surface
-    ha = (a**3 * Omega**2) / (G * M)
-
-    # epsilon at surface
-    epsilona = (5 * ha) / (2 * eta[-1] + 4)
-
-    # Solve the differential equation
-    LHS = dr * eta / r
-    if -np.inf in LHS:
-        LHS[LHS == -np.inf] = 0
-    LHS = np.cumsum(np.nan_to_num(LHS))
-    LHS = np.exp(LHS)
-    c = epsilona / LHS[-1]
-    epsilon = c * LHS
-
-    # Write out epsilon to text file for future usage
-    string = "".join(
-        [str(r[i]) + ", " + str(epsilon[i]) + "\n" for i in range(len(epsilon))]
-    )
-    f = open(filename, "w")
-    f.write(string)
-    f.close()
