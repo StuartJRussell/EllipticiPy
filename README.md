@@ -12,24 +12,28 @@ Authors:
 
 ### README.md
 
-This file
+This file.
 
 ### requirements.txt
 
-Software requirements of this package
+Software requirements of this package.
 
 ### LICENSE
 
-License for this package - standard MIT license
+License for this package - standard MIT license.
 
-### src/
+### pyproject.toml and setup.cfg
 
-Directory containing the source code
+Files that enable the package to be installed using pip. These should not be edited.
 
 ### src/ellipticity/main.py
 
-Main functions for users to interact with
+Main functions for users to interact with.
 
 ### src/ellipticity/tools.py
 
-Other functions that are required by main.py but that the user shouldn't need to interact with during normal usage
+Other functions that are required by main.py but that the user shouldn't need to interact with during normal usage.
+
+### src/ellipticity/epsilon/*txt
+
+Text files containing the epsilon profiles with radius for models that have been initialised for the package. The package will create these as and when they are required.
