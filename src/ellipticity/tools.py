@@ -17,7 +17,6 @@ import obspy
 import warnings
 import numpy as np
 from obspy.taup import TauPyModel
-
 # ---------------------------------------------------------------------------
 # Suppress warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -30,7 +29,7 @@ warnings.filterwarnings(
 # Define Exceptions
 class PhaseError(Exception):
     """
-    Class for handing exception of when there is no phase arrival for the inputted geometry.
+    Class for handing exception of when there is no phase arrival for the inputted geometry
     """
 
     def __init__(self, phase, vel_model):
@@ -167,7 +166,7 @@ def get_model_epsilon(model, lod, taper = True):
         taper - bool, whether to taper below ICB or not. Causes problems if False (and True is consistent with previous works, e.g. Bullen & Haddon (1973))
         
     Output:
-        adds arrays of epsilon and radius to the model instance as attributes.
+        Adds arrays of epsilon and radius to the model instance as attributes
     """
 
     # Angular velocity of model
@@ -237,7 +236,7 @@ def get_model_epsilon(model, lod, taper = True):
 
 def get_taup_arrival(phase, distance, source_depth, arrival_index, model):
     """
-    Returns a TauP arrival object for the given phase, distance, depth and velocity model.
+    Returns a TauP arrival object for the given phase, distance, depth and velocity model
 
     Inputs:
         phase - string, TauP phase name
@@ -269,7 +268,7 @@ def get_taup_arrival(phase, distance, source_depth, arrival_index, model):
     return arrivals[arrival_index]
 
 
-def get_correct_taup_arrival(arrival, model, extra_distance=0.0):
+def get_correct_taup_arrival(arrival, model, extra_distance = 0.):
     """
     Returns a TauP arrival object in the correct form if the original is not
 
@@ -359,7 +358,7 @@ def get_epsilon(model, radius):
     radii = model.model.s_mod.v_mod.epsilon_r
 
     # Get the nearest value of epsilon to the given radius
-    idx = np.searchsorted(radii, radius, side="left")
+    idx = np.searchsorted(radii, radius, side = "left")
     if idx > 0 and (
         idx == len(radii)
         or np.math.fabs(radius - radii[idx - 1]) < np.math.fabs(radius - radii[idx])
@@ -421,7 +420,7 @@ def get_dvdr(model, radius, wave):
     radii = model.model.s_mod.v_mod.dvdr_r
 
     # Get the nearest value of dv/dr to the given radius
-    idx = np.searchsorted(radii, radius, side="left")
+    idx = np.searchsorted(radii, radius, side = "left")
     if idx > 0 and (
         idx == len(radii)
         or np.math.fabs(radius - radii[idx - 1]) < np.math.fabs(radius - radii[idx])

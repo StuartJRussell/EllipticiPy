@@ -16,10 +16,9 @@ import warnings
 import numpy as np
 from obspy.taup import TauPyModel
 from .tools import calculate_coefficients, list_coefficients, alp2, factor
-
 # ---------------------------------------------------------------------------
 # Suppress warnings
-warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category = RuntimeWarning)
 warnings.filterwarnings(
     "ignore",
     message="Resizing a TauP array inplace failed due to the existence of other references to the array, creating a new array. See Obspy #2280.",
@@ -36,15 +35,15 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod = 86164.0
                   distance - float, epicentral distance in degrees
                   source_depth - float, source depth in km
                   index - int, the index of the desired arrival, starting from 0
-        source_latitude - float, source latitude in degrees
         azimuth - float, azimuth from source to receiver in degrees from N
+        source_latitude - float, source latitude in degrees
         model - TauPyModel object OR string defining the path to a velocity model usable by TauP
 
     Optional inputs:
-        lod - float, length of day of the model. Defaults to Earth values. Only needed the first time a model is used.
+        lod - float, length of day of the model. Defaults to Earth value
 
     Output:
-        float, ellipticity correction in seconds.
+        float, ellipticity correction in seconds
     """
 
     # Assess whether input is arrival or coefficients
