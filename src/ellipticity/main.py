@@ -13,12 +13,12 @@ ellipticity correction for a seismic ray path in a given model.
 # Import modules
 import obspy
 import numpy as np
-from .tools import calculate_coefficients, weighted_alp2, earth_lod
+from .tools import calculate_coefficients, weighted_alp2, EARTH_LOD
 
 
-def calculate_correction(arrival, azimuth, source_latitude, model, lod=earth_lod):
+def calculate_correction(arrival, azimuth, source_latitude, model, lod=EARTH_LOD):
     """
-    Returns the ellipticity correction to be added to a 1D traveltime for a given ray path in a 1D velocity model.
+    Returns the ellipticity correction to a 1D traveltime for a ray path in a 1D velocity model.
 
     Inputs:
         arrival - EITHER a TauP arrival object
@@ -40,7 +40,8 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod=earth_lod
     Example:
         >>> from obspy.taup import TauPyModel
         >>> model = TauPyModel('prem')
-        >>> arrival = model.get_ray_paths(source_depth_in_km = 124, distance_in_degree = 65, phase_list = ['pPKiKP'])
+        >>> arrival = model.get_ray_paths(source_depth_in_km = 124, distance_in_degree = 65,
+                phase_list = ['pPKiKP'])
         >>> calculate_correction(arrival, azimuth = 39, source_latitude = 45, model = model)
     """
 
@@ -53,16 +54,17 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod=earth_lod
         raise ValueError("Azimuth must be in range 0 to 360 degrees")
 
     # Assess whether input is arrival or coefficients
-    if type(arrival) == obspy.taup.helper_classes.Arrival or (
-        type(arrival) == list and len(arrival) == 4 and type(arrival[0]) == str
+    if isinstance(arrival, obspy.taup.helper_classes.Arrival) or (
+        isinstance(arrival, list) and len(arrival) == 4 and isinstance(arrival[0], str)
     ):
 
         # Get the coefficients
         sigma = [calculate_coefficients(arrival, model, lod)]
 
     # If a list of arrivals then deal with that
-    elif type(arrival) == obspy.taup.tau.Arrivals or (
-        type(arrival) == list and type(arrival[0]) == obspy.taup.helper_classes.Arrival
+    elif isinstance(arrival, obspy.taup.tau.Arrivals) or (
+        isinstance(arrival, list)
+        and isinstance(arrival[0], obspy.taup.helper_classes.Arrival)
     ):
 
         # Get coefficients for each entry in the list
@@ -70,7 +72,9 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod=earth_lod
 
     # Deal with the case where the inputs are coefficients
     elif (
-        type(arrival) == list and len(arrival) == 3 and float(arrival[0]) == arrival[0]
+        isinstance(arrival, list)
+        and len(arrival) == 3
+        and float(arrival[0]) == arrival[0]
     ):
 
         # Assign coefficients
@@ -96,5 +100,4 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod=earth_lod
     # Return value or list
     if len(dt) == 1:
         return dt[0]
-    else:
-        return dt
+    return dt

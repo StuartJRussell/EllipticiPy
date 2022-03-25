@@ -12,9 +12,8 @@ in the main file.
 """
 # ---------------------------------------------------------------------------
 # Import modules
-import os
-import obspy
 import warnings
+import obspy
 import numpy as np
 from obspy.taup import TauPyModel
 from scipy.integrate import cumtrapz
@@ -27,7 +26,7 @@ warnings.filterwarnings(
 )
 # ---------------------------------------------------------------------------
 
-earth_lod = 86164.0905 # s, length of day
+EARTH_LOD = 86164.0905  # s, length of day
 
 # Define Exceptions
 class PhaseError(Exception):
@@ -42,6 +41,7 @@ class PhaseError(Exception):
             + " does not arrive at specified distance in model "
             + vel_model
         )
+        super().__init__(self.message)
 
     def __str__(self):
         return self.message
@@ -54,8 +54,7 @@ def kron0(j):
 
     if j == 0:
         return 1
-    else:
-        return 0
+    return 0
 
 
 def weighted_alp2(m, theta):
@@ -77,13 +76,14 @@ def weighted_alp2(m, theta):
 
     if m == 0:
         return norm * 0.5 * (3.0 * np.cos(theta) ** 2.0 - 1.0)
-    elif m == 1:
+    if m == 1:
         return norm * 3.0 * np.cos(theta) * np.sin(theta)
-    elif m == 2:
+    if m == 2:
         return norm * 3.0 * np.sin(theta) ** 2.0
+    raise ValueError("Invalid value of m")
 
 
-def model_epsilon(model, lod=earth_lod, taper=True, dr=100):
+def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
     """
     Calculates a profile of ellipticity of figure (epsilon) through a planetary model.
 
@@ -196,7 +196,8 @@ def get_correct_taup_arrival(arrival, model, extra_distance=0.0):
     Inputs:
         arrival - TauP arrival object
         model - TauPyModel object
-        extra_distance - float, any further distance than the inputted arrival to obtain the new arrival
+        extra_distance - float, any further distance than the inputted arrival
+            to obtain the new arrival
 
     Output:
         TauP arrival object
@@ -277,8 +278,7 @@ def get_epsilon(model, radius):
         or np.math.fabs(radius - radii[idx - 1]) < np.math.fabs(radius - radii[idx])
     ):
         return epsilon[idx - 1]
-    else:
-        return epsilon[idx]
+    return epsilon[idx]
 
 
 def get_dvdr_below(model, radius, wave):
@@ -320,16 +320,16 @@ def get_dvdr_above(model, radius, wave):
 def evaluate_derivative_below(model, depth, prop):
     """Evaluate depth derivative of material property at bottom of a velocity layer."""
     layer = model.layers[model.layer_number_below(depth)]
-    return evaluate_derivative_at(layer, depth, prop)
+    return evaluate_derivative_at(layer, prop)
 
 
 def evaluate_derivative_above(model, depth, prop):
     """Evaluate depth derivative of material property at top of a velocity layer."""
     layer = model.layers[model.layer_number_above(depth)]
-    return evaluate_derivative_at(layer, depth, prop)
+    return evaluate_derivative_at(layer, prop)
 
 
-def evaluate_derivative_at(layer, depth, prop):
+def evaluate_derivative_at(layer, prop):
     """Evaluate depth derivative of material property in a velocity layer."""
 
     thick = layer["bot_depth"] - layer["top_depth"]
@@ -337,27 +337,29 @@ def evaluate_derivative_at(layer, depth, prop):
     if prop == "p":
         slope = (layer["bot_p_velocity"] - layer["top_p_velocity"]) / thick
         return slope
-    elif prop == "s":
+    if prop == "s":
         slope = (layer["bot_s_velocity"] - layer["top_s_velocity"]) / thick
         return slope
-    elif prop in "rd":
+    if prop in "rd":
         slope = (layer["bot_density"] - layer["top_density"]) / thick
         return slope
     raise ValueError("Unknown material property, use p, s, or d.")
 
 
-def calculate_coefficients(arrival, model, lod=earth_lod):
+def calculate_coefficients(arrival, model, lod=EARTH_LOD):
     """
     Returns ellipticity coefficients for a given ray path
 
     Inputs:
-        arrival - EITHER a TauP arrival object OR a list containing [phase, distance, source_depth, index] where:
-                  phase - string, TauP phase name
-                  distance - float, epicentral distance in degrees
-                  source_depth - float, source depth in km
-                  index - int, the index of the desired arrival, starting from 0
+        arrival - EITHER a TauP arrival object
+            OR a list containing [phase, distance, source_depth, index] where:
+                phase - string, TauP phase name
+                distance - float, epicentral distance in degrees
+                source_depth - float, source depth in km
+                index - int, the index of the desired arrival, starting from 0
         model - TauPyModel object
-        lod - float, length of day of the model in seconds, only needed if calculating coefficients for a new model
+        lod - float, length of day of the model in seconds, only needed if calculating
+            coefficients for a new model
 
     Output:
         list of three floats, ellipticity coefficients
@@ -368,24 +370,16 @@ def calculate_coefficients(arrival, model, lod=earth_lod):
     ########################
 
     # If model is not initialised then do so
-    if type(model) == str:
+    if isinstance(model, str):
         model = TauPyModel(model=model)
-    elif type(model) != obspy.taup.tau.TauPyModel:
+    elif not isinstance(model, obspy.taup.tau.TauPyModel):
         raise TypeError("Velocity model not correct type")
-
-    # Name of model
-    vel_model_name = str(model.model.s_mod.v_mod.model_name)
-    if "'" in vel_model_name:
-        vel_model = vel_model_name.split("'")[1]
-    else:
-        vel_model = vel_model_name
 
     # Radius of Earth
     Re = model.model.radius_of_planet
 
     # Get discontinuities in the model
     discs = model.model.s_mod.v_mod.get_discontinuity_depths()[:-1]
-    discsr = [Re - x for x in discs]
 
     # Calculate epsilon values if they don't already exist
     if not hasattr(model.model.s_mod.v_mod, "epsilon"):
@@ -396,7 +390,7 @@ def calculate_coefficients(arrival, model, lod=earth_lod):
     #########################
 
     # Check if arrival is a TauP object or a list and get arrival if needed
-    if type(arrival) == list:
+    if isinstance(arrival, list):
 
         # Call an arrival, this will error if it the phase input is unrealistic
         # Ideally users should use TauP Arrivals as inputs but some may not
@@ -404,12 +398,13 @@ def calculate_coefficients(arrival, model, lod=earth_lod):
             arrival[0], arrival[1], arrival[2], arrival[3], model
         )
 
-    elif type(arrival) == obspy.taup.helper_classes.Arrival and type(
-        arrival.path
-    ) == type(None):
+    elif (
+        isinstance(arrival, obspy.taup.helper_classes.Arrival) and arrival.path is None
+    ):
 
         # Call an arrival that has a ray path
-        # Ideally users should use the ObsPy TauP get_ray_paths() to get their Arrivals, but if they haven't then this will fix it
+        # Ideally users should use the ObsPy TauP get_ray_paths() to get their arrivals,
+        # but if they haven't then this will fix it
         warnings.warn(
             "Arrival does not have ray path, in future please input the correct arrival for greater efficiency"
         )
@@ -419,7 +414,8 @@ def calculate_coefficients(arrival, model, lod=earth_lod):
     if arrival.distance == 0.0:
 
         # Call an arrival that has non-zero ray parameter
-        # We can't integrate the ray when the ray parameter is zero, but the integral does converge when the distance is zero so just add a tiny bit of distance
+        # We can't integrate the ray when the ray parameter is zero, but the integral does converge
+        # when the distance is zero so just add a tiny bit of distance
         arrival = get_correct_taup_arrival(arrival, model, extra_distance=1e-10)
 
     # Bottoming depth of ray
@@ -427,8 +423,8 @@ def calculate_coefficients(arrival, model, lod=earth_lod):
 
     # When the ray goes close to the centre of the Earth, the distance function has a step in it
     # This is problematic to integrate along
-    # Instead, if the ray goes within 50m of the centre of the planet, calculate for nearby two values and interpolate
-    # This produces a satisfactory approximation
+    # Instead, if the ray goes within 50m of the centre of the planet, calculate for nearby two
+    # values and interpolate. This produces a satisfactory approximation
     if (model.model.radius_of_planet - bot_dep) * 1e3 < 50:
         sigma = centre_of_planet_coefficients(arrival, model)
 
@@ -455,13 +451,12 @@ def calculate_coefficients(arrival, model, lod=earth_lod):
         )
         letter = 0
         waves = []
-        for i in range(len(arrival.path)):
+        for i, pathi in enumerate(arrival.path):
             if (
                 i != 0
                 and i != len(arrival.path) - 1
-                and arrival.path[i][3]
-                in [0.0, model.model.cmb_depth, model.model.iocb_depth]
-                and arrival.path[i][3] != arrival.path[i - 1][3]
+                and pathi[3] in [0.0, model.model.cmb_depth, model.model.iocb_depth]
+                and pathi[3] != arrival.path[i - 1][3]
             ):
                 letter = letter + 1
             waves.append(segments[letter].lower())
@@ -470,17 +465,17 @@ def calculate_coefficients(arrival, model, lod=earth_lod):
         wave = {}
         paths = {}
         count = -1
-        for i in range(len(arrival.path)):
-            if (
-                i == 0 or arrival.path[i][3] in discs or arrival.path[i][3] == bot_dep
-            ) and i != len(arrival.path) - 1:
+        for i, pathi in enumerate(arrival.path):
+            if (i == 0 or pathi[3] in discs or pathi[3] == bot_dep) and i != len(
+                arrival.path
+            ) - 1:
                 count = count + 1
                 paths[count] = []
                 wave[count] = []
                 if count != 0:
-                    paths[count - 1].append(list(arrival.path[i]))
+                    paths[count - 1].append(list(pathi))
                     wave[count - 1].append(waves[i - 1])
-            paths[count].append(list(arrival.path[i]))
+            paths[count].append(list(pathi))
             wave[count].append(waves[i])
         paths = {x: np.array(paths[x]) for x in paths}
         wave_paths = {x: np.array(wave[x]) for x in paths}
@@ -559,19 +554,21 @@ def calculate_coefficients(arrival, model, lod=earth_lod):
         ##### Effects of discontinuities ####
         #####################################
 
-        # Including the bottoming depth allows cross indexing with the paths variable when the start point is not the lowest point on the ray path
+        # Including the bottoming depth allows cross indexing with the paths variable when
+        # the start point is not the lowest point on the ray path
         if bot_dep == arrival.path[0][3]:
             assess_discs = discs
         else:
             assess_discs = np.append(discs, bot_dep)
 
-        # Get which discontinuities the phase interacts with, include bottoming depth to allow cross indexing with the paths variable
+        # Get which discontinuities the phase interacts with, include bottoming depth to allow
+        # cross indexing with the paths variable
         ids = [
             (i, arrival.path[i][3], arrival.path[i][2])
             for i in range(len(arrival.path))
             if arrival.path[i][3] in assess_discs
         ]
-        if arrival.source_depth != 0 and arrival.source_depth != ids[0][1]:
+        if arrival.source_depth not in (0, ids[0][1]):
             ids = [(0, arrival.source_depth, 0)] + ids
         idiscs = {
             i: {
@@ -826,7 +823,7 @@ def calculate_coefficients(arrival, model, lod=earth_lod):
                 # Output coefficients for this discontinuity
                 idiscs[d]["sigma"] = {x: extra[x] * eva for x in [0, 1, 2]}
 
-        # Sum the contribution to the contribution to the coefficients from discontinuities
+        # Sum the contribution to the coefficients from discontinuities
         disc_sigma = {
             x: np.sum([idiscs[i]["sigma"][x] for i in idiscs if idiscs[i]["yn"]])
             for x in [0, 1, 2]
