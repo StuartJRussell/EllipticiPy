@@ -17,9 +17,10 @@ import obspy
 import warnings
 import numpy as np
 from obspy.taup import TauPyModel
+from scipy.integrate import cumtrapz
+
 # ---------------------------------------------------------------------------
 # Suppress warnings
-warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings(
     "ignore",
     message="Resizing a TauP array inplace failed due to the existence of other references to the array, creating a new array. See Obspy #2280.",
@@ -156,62 +157,60 @@ def calculate_model_dvdr(model):
     )
 
 
-def get_model_epsilon(model, lod, taper = True):
+def get_model_epsilon(model, lod=86164.0905, taper=True, dr=100):
     """
     Calculates a profile of ellipticity of figure (epsilon) through a planetary model.
 
     Inputs:
         model - TauPyModel
         lod - float, length of day in the model in seconds
-        taper - bool, whether to taper below ICB or not. Causes problems if False (and True is consistent with previous works, e.g. Bullen & Haddon (1973))
-        
+        taper - bool, whether to taper below ICB or not. Causes problems if False
+            (and True is consistent with previous works, e.g. Bullen & Haddon (1973))
+        dr - float, step length in metres for discretization
+
     Output:
         Adds arrays of epsilon and radius to the model instance as attributes
+        model.model.s_mod.v_mod.epsilon_r and model.model.s_mod.v_mod.epsilon
     """
 
     # Angular velocity of model
-    Omega = 2 * np.pi / lod
+    Omega = 2 * np.pi / lod  # s^-1
 
     # Universal gravitational constant
-    G = 6.67408 * 10 ** (-11)
+    G = 6.67408e-11  # m^3 kg^-1 s^-2
 
-    # Radius of Earth
+    # Radius of planet in m
     a = model.model.radius_of_planet * 1e3
 
-    # Loop over r and calculate the total mass of the body in kg and moment of inertia
-    # Radius steps in m
-    dr = 100
+    # Radii to evaluate integrals
     r = np.arange(0, a + dr, dr)
 
-    # Get the density at these depths
+    # Get the density (in kg m^-3) at these radii
     rho = np.append(
         model.model.s_mod.v_mod.evaluate_above((a - r[:-1]) / 1000.0, "d") * 1000.0,
         model.model.s_mod.v_mod.evaluate_below(0.0, "d")[0] * 1000.0,
     )
 
     # Mass within each spherical shell
-    Mr = np.cumsum(4 * np.pi * rho * (r**2) * dr)
+    Mr = 4 * np.pi * cumtrapz(rho * (r**2) * dr)
 
     # Total mass of body
     M = Mr[-1]
 
     # Moment of inertia of each spherical shell
-    Ir = (8.0 / 3.0) * np.pi * np.cumsum(rho * (r**4) * dr)
-
-    # Moment of inertia at surface
-    I = Ir[-1]
+    Ir = (8.0 / 3.0) * np.pi * cumtrapz(rho * (r**4) * dr)
 
     # Calculate y (moment of inertia factor) for surfaces within the body
-    y = Ir / (Mr * r**2)
+    y = Ir / (Mr * r[1:] ** 2)
 
     # Taper if required
-    # Taper at closest point to 0.4, this is where eta is 0
+    # Have maximum y of 0.4, this is where eta is 0
     # Otherwise epsilon tends to infinity at the centre of the planet
     if taper:
-        y = np.array([x if x < 0.4 else 0.4 for x in y])
+        y[y > 0.4] = 0.4
 
     # Calculate Radau's parameter
-    eta = 6.25 * (1 - 3 * (y) / 2) ** 2 - 1
+    eta = 6.25 * (1 - 3 * y / 2) ** 2 - 1
 
     # Calculate h
     # Ratio of centrifugal force and gravity for a particle on the equator at the surface
@@ -221,15 +220,11 @@ def get_model_epsilon(model, lod, taper = True):
     epsilona = (5 * ha) / (2 * eta[-1] + 4)
 
     # Solve the differential equation
-    LHS = dr * eta / r
-    if -np.inf in LHS:
-        LHS[LHS == -np.inf] = 0
-    LHS = np.cumsum(np.nan_to_num(LHS))
-    LHS = np.exp(LHS)
-    c = epsilona / LHS[-1]
-    epsilon = c * LHS
-    
-    #Output as model attributes
+    epsilon = np.exp(cumtrapz(dr * eta / r[1:], initial=0.0))
+    epsilon = epsilona * epsilon / epsilon[-1]
+    epsilon = np.insert(epsilon, 0, epsilon[0])  # add a centre of planet value
+
+    # Output as model attributes
     model.model.s_mod.v_mod.epsilon_r = r
     model.model.s_mod.v_mod.epsilon = epsilon
 
@@ -268,7 +263,7 @@ def get_taup_arrival(phase, distance, source_depth, arrival_index, model):
     return arrivals[arrival_index]
 
 
-def get_correct_taup_arrival(arrival, model, extra_distance = 0.):
+def get_correct_taup_arrival(arrival, model, extra_distance=0.0):
     """
     Returns a TauP arrival object in the correct form if the original is not
 
@@ -358,7 +353,7 @@ def get_epsilon(model, radius):
     radii = model.model.s_mod.v_mod.epsilon_r
 
     # Get the nearest value of epsilon to the given radius
-    idx = np.searchsorted(radii, radius, side = "left")
+    idx = np.searchsorted(radii, radius, side="left")
     if idx > 0 and (
         idx == len(radii)
         or np.math.fabs(radius - radii[idx - 1]) < np.math.fabs(radius - radii[idx])
@@ -420,7 +415,7 @@ def get_dvdr(model, radius, wave):
     radii = model.model.s_mod.v_mod.dvdr_r
 
     # Get the nearest value of dv/dr to the given radius
-    idx = np.searchsorted(radii, radius, side = "left")
+    idx = np.searchsorted(radii, radius, side="left")
     if idx > 0 and (
         idx == len(radii)
         or np.math.fabs(radius - radii[idx - 1]) < np.math.fabs(radius - radii[idx])
@@ -670,7 +665,9 @@ def calculate_coefficients(arrival, model, lod):
             }
             # Do the integration
             seg_ray_sigma[x] = {
-                m: np.sum(np.trapz((eta**3.0) * dvdr * epsilon * lamda[m], x=dist) / p)
+                m: np.sum(
+                    np.trapz((eta**3.0) * dvdr * epsilon * lamda[m], x=dist) / p
+                )
                 for m in [0, 1, 2]
             }
 
