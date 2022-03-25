@@ -13,10 +13,10 @@ ellipticity correction for a seismic ray path in a given model.
 # Import modules
 import obspy
 import numpy as np
-from .tools import calculate_coefficients, weighted_alp2, EARTH_LOD
+from .tools import ellipticity_coefficients, weighted_alp2, EARTH_LOD
 
 
-def calculate_correction(arrival, azimuth, source_latitude, model, lod=EARTH_LOD):
+def ellipticity_correction(arrival, azimuth, source_latitude, model, lod=EARTH_LOD):
     """
     Returns the ellipticity correction to a 1D traveltime for a ray path in a 1D velocity model.
 
@@ -42,7 +42,7 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod=EARTH_LOD
         >>> model = TauPyModel('prem')
         >>> arrival = model.get_ray_paths(source_depth_in_km = 124, distance_in_degree = 65,
                 phase_list = ['pPKiKP'])
-        >>> calculate_correction(arrival, azimuth = 39, source_latitude = 45, model = model)
+        >>> ellipticity_correction(arrival, azimuth = 39, source_latitude = 45, model = model)
     """
 
     # Enforce that event latitude must be in range -90 to 90 degrees
@@ -59,7 +59,7 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod=EARTH_LOD
     ):
 
         # Get the coefficients
-        sigma = [calculate_coefficients(arrival, model, lod)]
+        sigma = [ellipticity_coefficients(arrival, model, lod)]
 
     # If a list of arrivals then deal with that
     elif isinstance(arrival, obspy.taup.tau.Arrivals) or (
@@ -68,7 +68,7 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod=EARTH_LOD
     ):
 
         # Get coefficients for each entry in the list
-        sigma = [calculate_coefficients(arr, model, lod) for arr in arrival]
+        sigma = [ellipticity_coefficients(arr, model, lod) for arr in arrival]
 
     # Deal with the case where the inputs are coefficients
     elif (
