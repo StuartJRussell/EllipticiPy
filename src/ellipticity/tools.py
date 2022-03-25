@@ -27,6 +27,8 @@ warnings.filterwarnings(
 )
 # ---------------------------------------------------------------------------
 
+earth_lod = 86164.0905 # s, length of day
+
 # Define Exceptions
 class PhaseError(Exception):
     """
@@ -81,7 +83,7 @@ def weighted_alp2(m, theta):
         return norm * 3.0 * np.sin(theta) ** 2.0
 
 
-def get_model_epsilon(model, lod=86164.0905, taper=True, dr=100):
+def model_epsilon(model, lod=earth_lod, taper=True, dr=100):
     """
     Calculates a profile of ellipticity of figure (epsilon) through a planetary model.
 
@@ -344,7 +346,7 @@ def evaluate_derivative_at(layer, depth, prop):
     raise ValueError("Unknown material property, use p, s, or d.")
 
 
-def calculate_coefficients(arrival, model, lod):
+def calculate_coefficients(arrival, model, lod=earth_lod):
     """
     Returns ellipticity coefficients for a given ray path
 
@@ -387,7 +389,7 @@ def calculate_coefficients(arrival, model, lod):
 
     # Calculate epsilon values if they don't already exist
     if not hasattr(model.model.s_mod.v_mod, "epsilon"):
-        get_model_epsilon(model, lod)
+        model_epsilon(model, lod)
 
     #########################
     ##### Get an arrival ####
