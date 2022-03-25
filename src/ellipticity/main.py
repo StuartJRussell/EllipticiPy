@@ -12,20 +12,10 @@ ellipticity correction for a seismic ray path in a given model.
 # ---------------------------------------------------------------------------
 # Import modules
 import obspy
-import warnings
 import numpy as np
-from obspy.taup import TauPyModel
 from .tools import calculate_coefficients, list_coefficients, alp2, factor
-# ---------------------------------------------------------------------------
-# Suppress warnings
-warnings.filterwarnings("ignore", category = RuntimeWarning)
-warnings.filterwarnings(
-    "ignore",
-    message="Resizing a TauP array inplace failed due to the existence of other references to the array, creating a new array. See Obspy #2280.",
-)
-# ---------------------------------------------------------------------------
 
-def calculate_correction(arrival, azimuth, source_latitude, model, lod = 86164.0905):
+def calculate_correction(arrival, azimuth, source_latitude, model, lod=86164.0905):
     """
     Returns the ellipticity correction to be added to a 1D traveltime for a given ray path in a 1D velocity model.
 
@@ -44,16 +34,22 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod = 86164.0
 
     Output:
         float, ellipticity correction in seconds
+
+    Example:
+        >>> from obspy.taup import TauPyModel
+        >>> model = TauPyModel('prem')
+        >>> arrival = model.get_ray_paths(source_depth_in_km = 124, distance_in_degree = 65, phase_list = ['pPKiKP'])
+        >>> calculate_correction(arrival, azimuth = 39, source_latitude = 45, model = model)
     """
 
-    #Enforce that event latitude must be in range -90 to 90 degrees
+    # Enforce that event latitude must be in range -90 to 90 degrees
     if not -90 <= source_latitude <= 90:
         raise ValueError("Source latitude must be in range -90 to 90 degrees")
-        
-    #Enforce that azimuth must be in range 0 to 360 degrees
+
+    # Enforce that azimuth must be in range 0 to 360 degrees
     if not 0 <= azimuth <= 360:
         raise ValueError("Azimuth must be in range 0 to 360 degrees")
-        
+
     # Assess whether input is arrival or coefficients
     if type(arrival) == obspy.taup.helper_classes.Arrival or (
         type(arrival) == list and len(arrival) == 4 and type(arrival[0]) == str
@@ -80,7 +76,7 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod = 86164.0
 
     else:
         raise TypeError("Arrival/Coefficients not correctly defined")
-    
+
     # Convert azimuth to radians
     az = np.radians(azimuth)
 
