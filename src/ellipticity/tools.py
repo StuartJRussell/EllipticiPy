@@ -68,7 +68,7 @@ def weighted_alp2(m, theta):
         out - float, value of weighted associated Legendre polynomial of degree 2 and order m
               at x = cos(theta)
     """
-    
+
     norm = np.sqrt(
         (2 - kron0(m)) * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
     )
@@ -79,67 +79,6 @@ def weighted_alp2(m, theta):
         return norm * 3.0 * np.cos(theta) * np.sin(theta)
     elif m == 2:
         return norm * 3.0 * np.sin(theta) ** 2.0
-
-
-def calculate_model_dvdr(model):
-    """
-    Calculates the rate of change of velocity with radius for a given velocity model.
-
-    Inputs:
-        model - TauPyModel
-
-    Output:
-        adds arrays of dv/dr and radius to the model instance as attributes
-        model.model.s_mod.v_mod.dvdr and
-        model.model.s_mod.v_mod.dvdr_r
-    """
-
-    # Radius of planet
-    Re = model.model.radius_of_planet
-
-    # Discontinuities in the model
-    discs = model.model.s_mod.v_mod.get_discontinuity_depths()
-
-    # Depths between discontinuities
-    deps = [
-        np.linspace(
-            discs[i] * 1e3,
-            discs[i + 1] * 1e3,
-            int(np.floor((discs[i + 1] * 1e3 - discs[i] * 1e3) / 1000)),
-        )
-        for i in range(len(discs) - 1)
-    ]
-    if deps[-1][-1] != model.model.radius_of_planet * 1e3:
-        deps[-1] = np.append(deps[-1], model.model.radius_of_planet * 1e3)
-    # Radii
-    r = [Re * 1e3 - np.array(deps[i]) for i in range(len(deps))]
-    # Velocities
-    v = {
-        ph: [
-            np.append(
-                model.model.s_mod.v_mod.evaluate_below(deps[i][:-1] / 1e3, ph) * 1e3,
-                model.model.s_mod.v_mod.evaluate_above(deps[i][-1] / 1e3, ph) * 1e3,
-            )
-            for i in range(len(deps))
-        ]
-        for ph in ["p", "s"]
-    }
-    # Steps in velocity
-    dv = {ph: [np.gradient(v[ph][i]) for i in range(len(deps))] for ph in ["p", "s"]}
-    # Steps in radius
-    dr = [np.gradient(r[i]) for i in range(len(deps))]
-
-    # Calculate and output dvdr and corresponding radii
-    model.model.s_mod.v_mod.dvdr = {
-        ph: np.flip(
-            np.array(sum([list(dv[ph][i] / dr[i]) for i in range(len(deps))], [])),
-            axis=0,
-        )
-        for ph in ["p", "s"]
-    }
-    model.model.s_mod.v_mod.dvdr_r = np.flip(
-        np.array(sum([list(x) for x in r], [])), axis=0
-    )
 
 
 def get_model_epsilon(model, lod=86164.0905, taper=True, dr=100):
@@ -340,62 +279,22 @@ def get_epsilon(model, radius):
         return epsilon[idx]
 
 
-def get_epsilon_above(model, radius):
+def get_dvdr_below(model, radius, wave):
     """
-    Gets the value of epsilon for that model immediately above a specified radius
+    Gets the value of dv/dr for that model immediately below a specified radius
 
     Inputs:
         model - TauPyModel object
-        radius - float, radius  in m
-
-    Output:
-        float, value of epsilon
-    """
-
-    return get_epsilon(model, radius + 1)
-
-
-def get_epsilon_below(model, radius):
-    """
-    Gets the value of epsilon for that model immediately below a specified radius
-
-    Inputs:
-        model - TauPyModel object
-        radius - float, radius  in m
-
-    Output:
-        float, value of epsilon
-    """
-
-    return get_epsilon(model, radius - 1)
-
-
-def get_dvdr(model, radius, wave):
-    """
-    Gets the value of dv/dr for that model at a specified radius
-
-    Inputs:
-        model - TauPyModel object
-        radius - float, radius  in m
+        radius - float, radius in m
         wave - str, wave type: 'p' or 's'
 
     Output:
         float, value of dv/dr
     """
 
-    # dv/dr and radii
-    dvdr = model.model.s_mod.v_mod.dvdr[wave]
-    radii = model.model.s_mod.v_mod.dvdr_r
-
-    # Get the nearest value of dv/dr to the given radius
-    idx = np.searchsorted(radii, radius, side="left")
-    if idx > 0 and (
-        idx == len(radii)
-        or np.math.fabs(radius - radii[idx - 1]) < np.math.fabs(radius - radii[idx])
-    ):
-        return dvdr[idx - 1]
-    else:
-        return dvdr[idx]
+    Re = model.model.radius_of_planet
+    v_mod = model.model.s_mod.v_mod
+    return -evaluate_derivative_below(v_mod, Re - radius / 1e3, wave)[0]
 
 
 def get_dvdr_above(model, radius, wave):
@@ -404,30 +303,45 @@ def get_dvdr_above(model, radius, wave):
 
     Inputs:
         model - TauPyModel object
-        radius - float, radius  in m
+        radius - float, radius in m
         wave - str, wave type: 'p' or 's'
 
     Output:
         float, value of dv/dr
     """
 
-    return get_dvdr(model, radius + 1, wave)
+    Re = model.model.radius_of_planet
+    v_mod = model.model.s_mod.v_mod
+    return -evaluate_derivative_above(v_mod, Re - radius / 1e3, wave)[0]
 
 
-def get_dvdr_below(model, radius, wave):
-    """
-    Gets the value of dv/dr for that model immediately below a specified radius
+def evaluate_derivative_below(model, depth, prop):
+    """Evaluate depth derivative of material property at bottom of a velocity layer."""
+    layer = model.layers[model.layer_number_below(depth)]
+    return evaluate_derivative_at(layer, depth, prop)
 
-    Inputs:
-        model - TauPyModel object
-        radius - float, radius  in m
-        wave - str, wave type: 'p' or 's'
 
-    Output:
-        float, value of dv/dr
-    """
+def evaluate_derivative_above(model, depth, prop):
+    """Evaluate depth derivative of material property at top of a velocity layer."""
+    layer = model.layers[model.layer_number_above(depth)]
+    return evaluate_derivative_at(layer, depth, prop)
 
-    return get_dvdr(model, radius - 1, wave)
+
+def evaluate_derivative_at(layer, depth, prop):
+    """Evaluate depth derivative of material property at some depth in a velocity layer."""
+
+    thick = layer["bot_depth"] - layer["top_depth"]
+    prop = prop.lower()
+    if prop == "p":
+        slope = (layer["bot_p_velocity"] - layer["top_p_velocity"]) / thick
+        return slope
+    elif prop == "s":
+        slope = (layer["bot_s_velocity"] - layer["top_s_velocity"]) / thick
+        return slope
+    elif prop in "rd":
+        slope = (layer["bot_density"] - layer["top_density"]) / thick
+        return slope
+    raise ValueError("Unknown material property, use p, s, or d.")
 
 
 def calculate_coefficients(arrival, model, lod):
@@ -463,10 +377,6 @@ def calculate_coefficients(arrival, model, lod):
         vel_model = vel_model_name.split("'")[1]
     else:
         vel_model = vel_model_name
-
-    # Calculate dv/dr if it doesn't already exist
-    if not hasattr(model.model.s_mod.v_mod, "dvdr"):
-        calculate_model_dvdr(model)
 
     # Radius of Earth
     Re = model.model.radius_of_planet
@@ -620,9 +530,9 @@ def calculate_coefficients(arrival, model, lod):
             # epsilon
             epsilon = np.array(
                 [
-                    get_epsilon_below(model, r[i])
+                    get_epsilon(model, r[i])
                     if dep[i] != max(dep)
-                    else get_epsilon_above(model, r[i])
+                    else get_epsilon(model, r[i])
                     for i in range(len(path))
                 ]
             )
