@@ -13,10 +13,10 @@ ellipticity correction for a seismic ray path in a given model.
 # Import modules
 import obspy
 import numpy as np
-from .tools import calculate_coefficients, weighted_alp2
+from .tools import calculate_coefficients, weighted_alp2, earth_lod
 
 
-def calculate_correction(arrival, azimuth, source_latitude, model, lod=86164.0905):
+def calculate_correction(arrival, azimuth, source_latitude, model, lod=earth_lod):
     """
     Returns the ellipticity correction to be added to a 1D traveltime for a given ray path in a 1D velocity model.
 

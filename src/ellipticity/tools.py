@@ -330,7 +330,7 @@ def evaluate_derivative_above(model, depth, prop):
 
 
 def evaluate_derivative_at(layer, depth, prop):
-    """Evaluate depth derivative of material property at some depth in a velocity layer."""
+    """Evaluate depth derivative of material property in a velocity layer."""
 
     thick = layer["bot_depth"] - layer["top_depth"]
     prop = prop.lower()
@@ -832,9 +832,9 @@ def calculate_coefficients(arrival, model, lod=earth_lod):
             for x in [0, 1, 2]
         }
 
-        ##############################
-        ##### Sum to coefficients ####
-        ##############################
+        ################################
+        ##### Sum the contributions ####
+        ################################
 
         # Sum the contribution from the ray path and the discontinuities to get final coefficients
         sigma = [ray_sigma[x] + disc_sigma[x] for x in [0, 1, 2]]
