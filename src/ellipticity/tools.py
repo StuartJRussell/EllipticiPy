@@ -100,7 +100,8 @@ def calculate_model_dvdr(model):
         model - TauPyModel
 
     Output:
-        adds arrays of dv/dr and radius to the model instance as attribute
+        adds arrays of dv/dr and radius to the model instance as attributes
+        model.model.s_mod.v_mod.dvdr and
         model.model.s_mod.v_mod.dvdr_r
     """
 
