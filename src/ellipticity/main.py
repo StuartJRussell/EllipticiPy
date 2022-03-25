@@ -13,7 +13,7 @@ ellipticity correction for a seismic ray path in a given model.
 # Import modules
 import obspy
 import numpy as np
-from .tools import calculate_coefficients, list_coefficients, alp2, factor
+from .tools import calculate_coefficients, weighted_alp2
 
 
 def calculate_correction(arrival, azimuth, source_latitude, model, lod=86164.0905):
@@ -66,7 +66,7 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod=86164.090
     ):
 
         # Get coefficients for each entry in the list
-        sigma = list_coefficients(arrival, model, lod)
+        sigma = [calculate_coefficients(arr, model, lod) for arr in arrival]
 
     # Deal with the case where the inputs are coefficients
     elif (
@@ -88,7 +88,7 @@ def calculate_correction(arrival, azimuth, source_latitude, model, lod=86164.090
     # Calculate time
     dt = np.array(
         [
-            sum(sig[m] * factor(m) * alp2(m, evcla) * np.cos(m * az) for m in [0, 1, 2])
+            sum(sig[m] * weighted_alp2(m, evcla) * np.cos(m * az) for m in [0, 1, 2])
             for sig in sigma
         ]
     )

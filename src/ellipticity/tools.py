@@ -56,25 +56,9 @@ def kron0(j):
         return 0
 
 
-def factor(m):
+def weighted_alp2(m, x):
     """
-    Returns the weighting for the associated Legendre polynomial
-
-    Inputs:
-        m - int, order of polynomial
-
-    Output:
-        out - float, value of the weighting
-    """
-
-    return np.sqrt(
-        (2 - kron0(m)) * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
-    )
-
-
-def alp2(m, x):
-    """
-    Returns the degree 2 associated Legendre polynomial for a given order and value.
+    Returns the weighted degree 2 associated Legendre polynomial for a given order and value.
 
     Inputs:
         m - int, order of polynomial
@@ -83,13 +67,17 @@ def alp2(m, x):
     Output:
         out - float, value of associated Legendre polynomial of degree 2 and order m at value x
     """
+    
+    norm = np.sqrt(
+        (2 - kron0(m)) * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
+    )
 
     if m == 0:
-        return 0.5 * (3.0 * np.cos(x) ** 2.0 - 1.0)
+        return norm * 0.5 * (3.0 * np.cos(x) ** 2.0 - 1.0)
     elif m == 1:
-        return 3.0 * np.cos(x) * np.sin(x)
+        return norm * 3.0 * np.cos(x) * np.sin(x)
     elif m == 2:
-        return 3.0 * np.sin(x) ** 2.0
+        return norm * 3.0 * np.sin(x) ** 2.0
 
 
 def calculate_model_dvdr(model):
@@ -322,11 +310,6 @@ def centre_of_planet_coefficients(arrival, model):
     ]
 
     return coeffs
-
-
-def list_coefficients(arrival, model, lod):
-    """Get a correction for each arrival"""
-    return [calculate_coefficients(arr, model, lod=lod) for arr in arrival]
 
 
 def get_epsilon(model, radius):
@@ -646,7 +629,7 @@ def calculate_coefficients(arrival, model, lod):
             dist = np.array([x[2] for x in path])
             # lambda
             lamda = {
-                x: factor(x) * (-1.0) * (2.0 / 3.0) * alp2(x, dist) for x in [0, 1, 2]
+                x: (-1.0) * (2.0 / 3.0) * weighted_alp2(x, dist) for x in [0, 1, 2]
             }
             # Do the integration
             seg_ray_sigma[x] = {
@@ -715,7 +698,7 @@ def calculate_coefficients(arrival, model, lod):
 
                 # lambda at this distance
                 idiscs[d]["lambda"] = {
-                    x: factor(x) * (-1.0) * (2.0 / 3.0) * alp2(x, idiscs[d]["dist"])
+                    x: (-1.0) * (2.0 / 3.0) * weighted_alp2(x, idiscs[d]["dist"])
                     for x in [0, 1, 2]
                 }
 
