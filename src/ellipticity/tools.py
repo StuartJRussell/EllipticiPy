@@ -51,11 +51,9 @@ def kron0(j):
     """
 
     if j == 0:
-        out = 1
+        return 1
     else:
-        out = 0
-
-    return out
+        return 0
 
 
 def factor(m):
@@ -69,11 +67,9 @@ def factor(m):
         out - float, value of the weighting
     """
 
-    fact = np.sqrt(
+    return np.sqrt(
         (2 - kron0(m)) * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
     )
-
-    return fact
 
 
 def alp2(m, x):
@@ -89,13 +85,11 @@ def alp2(m, x):
     """
 
     if m == 0:
-        out = 0.5 * (3.0 * np.cos(x) ** 2.0 - 1.0)
+        return 0.5 * (3.0 * np.cos(x) ** 2.0 - 1.0)
     elif m == 1:
-        out = 3.0 * np.cos(x) * np.sin(x)
+        return 3.0 * np.cos(x) * np.sin(x)
     elif m == 2:
-        out = 3.0 * np.sin(x) ** 2.0
-
-    return out
+        return 3.0 * np.sin(x) ** 2.0
 
 
 def calculate_model_dvdr(model):
@@ -106,7 +100,8 @@ def calculate_model_dvdr(model):
         model - TauPyModel
 
     Output:
-        adds arrays of dv/dr and radius to the model instance as attributes.
+        adds arrays of dv/dr and radius to the model instance as attribute
+        model.model.s_mod.v_mod.dvdr_r
     """
 
     # Radius of planet
@@ -329,11 +324,8 @@ def centre_of_planet_coefficients(arrival, model):
 
 
 def list_coefficients(arrival, model, lod):
-
-    # Get a correction for each arrival
-    coeffs = [calculate_coefficients(arr, model, lod=lod) for arr in arrival]
-
-    return coeffs
+    """Get a correction for each arrival"""
+    return [calculate_coefficients(arr, model, lod=lod) for arr in arrival]
 
 
 def get_epsilon(model, radius):
@@ -375,9 +367,7 @@ def get_epsilon_above(model, radius):
         float, value of epsilon
     """
 
-    out = get_epsilon(model, radius + 1)
-
-    return out
+    return get_epsilon(model, radius + 1)
 
 
 def get_epsilon_below(model, radius):
@@ -392,9 +382,7 @@ def get_epsilon_below(model, radius):
         float, value of epsilon
     """
 
-    out = get_epsilon(model, radius - 1)
-
-    return out
+    return get_epsilon(model, radius - 1)
 
 
 def get_dvdr(model, radius, wave):
@@ -438,9 +426,7 @@ def get_dvdr_above(model, radius, wave):
         float, value of dv/dr
     """
 
-    out = get_dvdr(model, radius + 1, wave)
-
-    return out
+    return get_dvdr(model, radius + 1, wave)
 
 
 def get_dvdr_below(model, radius, wave):
@@ -456,9 +442,7 @@ def get_dvdr_below(model, radius, wave):
         float, value of dv/dr
     """
 
-    out = get_dvdr(model, radius - 1, wave)
-
-    return out
+    return get_dvdr(model, radius - 1, wave)
 
 
 def calculate_coefficients(arrival, model, lod):

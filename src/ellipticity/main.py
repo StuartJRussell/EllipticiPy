@@ -15,16 +15,18 @@ import obspy
 import numpy as np
 from .tools import calculate_coefficients, list_coefficients, alp2, factor
 
+
 def calculate_correction(arrival, azimuth, source_latitude, model, lod=86164.0905):
     """
     Returns the ellipticity correction to be added to a 1D traveltime for a given ray path in a 1D velocity model.
 
     Inputs:
-        arrival - EITHER a TauP arrival object OR a list containing [phase, distance, source_depth, index] where:
-                  phase - string, TauP phase name
-                  distance - float, epicentral distance in degrees
-                  source_depth - float, source depth in km
-                  index - int, the index of the desired arrival, starting from 0
+        arrival - EITHER a TauP arrival object
+            OR a list containing [phase, distance, source_depth, index] where:
+                phase - string, TauP phase name
+                distance - float, epicentral distance in degrees
+                source_depth - float, source depth in km
+                index - int, the index of the desired arrival, starting from 0
         azimuth - float, azimuth from source to receiver in degrees from N
         source_latitude - float, source latitude in degrees
         model - TauPyModel object OR string defining the path to a velocity model usable by TauP
