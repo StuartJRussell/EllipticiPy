@@ -56,16 +56,17 @@ def kron0(j):
         return 0
 
 
-def weighted_alp2(m, x):
+def weighted_alp2(m, theta):
     """
     Returns the weighted degree 2 associated Legendre polynomial for a given order and value.
 
     Inputs:
-        m - int, order of polynomial
-        x - float, value to calculate at
+        m - int, order of polynomial (0, 1, or 2)
+        theta - float
 
     Output:
-        out - float, value of associated Legendre polynomial of degree 2 and order m at value x
+        out - float, value of weighted associated Legendre polynomial of degree 2 and order m
+              at x = cos(theta)
     """
     
     norm = np.sqrt(
@@ -73,11 +74,11 @@ def weighted_alp2(m, x):
     )
 
     if m == 0:
-        return norm * 0.5 * (3.0 * np.cos(x) ** 2.0 - 1.0)
+        return norm * 0.5 * (3.0 * np.cos(theta) ** 2.0 - 1.0)
     elif m == 1:
-        return norm * 3.0 * np.cos(x) * np.sin(x)
+        return norm * 3.0 * np.cos(theta) * np.sin(theta)
     elif m == 2:
-        return norm * 3.0 * np.sin(x) ** 2.0
+        return norm * 3.0 * np.sin(theta) ** 2.0
 
 
 def calculate_model_dvdr(model):
