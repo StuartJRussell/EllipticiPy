@@ -55,37 +55,16 @@ def ellipticity_correction(
     if not 0 <= azimuth <= 360:
         raise ValueError("Azimuth must be in range 0 to 360 degrees")
 
-    # Assess whether input is arrivals or coefficients
-    if isinstance(arrivals, obspy.taup.helper_classes.Arrival) or (
-        isinstance(arrivals, list)
-        and len(arrivals) == 4
-        and isinstance(arrivals[0], str)
-    ):
-
-        # Get the coefficients
-        sigma = [ellipticity_coefficients(arrivals, model, lod)]
-
-    # If a list of arrivals then deal with that
-    elif isinstance(arrivals, obspy.taup.tau.Arrivals) or (
-        isinstance(arrivals, list)
-        and isinstance(arrivals[0], obspy.taup.helper_classes.Arrival)
-    ):
-
-        # Get coefficients for each entry in the list
-        sigma = [ellipticity_coefficients(arr, model, lod) for arr in arrivals]
-
     # Deal with the case where the inputs are coefficients
-    elif (
+    if (
         isinstance(arrivals, list)
         and len(arrivals) == 3
-        and float(arrivals[0]) == arrivals[0]
+        and isinstance(arrivals[0], float)
     ):
-
-        # Assign coefficients
-        sigma = [arrivals]
+        sigma = [arrivals]  # Assign coefficients
 
     else:
-        raise TypeError("Arrival/Coefficients not correctly defined")
+        sigma = ellipticity_coefficients(arrivals, model, lod)
 
     # Convert azimuth to radians
     az = np.radians(azimuth)
