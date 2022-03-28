@@ -23,51 +23,6 @@ warnings.filterwarnings(
 EARTH_LOD = 86164.0905  # s, length of day
 G = 6.67408e-11  # m^3 kg^-1 s^-2, universal gravitational constant
 
-# Define Exceptions
-class PhaseError(Exception):
-    """
-    Class for handing exception of when there is no phase arrival for the inputted geometry
-    """
-
-    def __init__(self, phase, vel_model):
-        self.message = (
-            "Phase "
-            + phase
-            + " does not arrive at specified distance in model "
-            + vel_model
-        )
-        super().__init__(self.message)
-
-    def __str__(self):
-        return self.message
-
-
-def weighted_alp2(m, theta):
-    """
-    Returns the weighted degree 2 associated Legendre polynomial for a given order and value.
-
-    Inputs:
-        m - int, order of polynomial (0, 1, or 2)
-        theta - float
-
-    Output:
-        out - float, value of weighted associated Legendre polynomial of degree 2 and order m
-              at x = cos(theta)
-    """
-
-    kronecker_0m = 1 if m == 0 else 0
-    norm = np.sqrt(
-        (2 - kronecker_0m) * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
-    )
-
-    if m == 0:
-        return norm * 0.5 * (3.0 * np.cos(theta) ** 2.0 - 1.0)
-    if m == 1:
-        return norm * 3.0 * np.cos(theta) * np.sin(theta)
-    if m == 2:
-        return norm * 3.0 * np.sin(theta) ** 2.0
-    raise ValueError("Invalid value of m")
-
 
 def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
     """
@@ -165,106 +120,6 @@ def get_epsilon(model, radius):
     return epsilon[idx]
 
 
-def get_taup_arrival(phase, distance, source_depth, arrival_index, model):
-    """
-    Returns a TauP arrival object for the given phase, distance, depth and velocity model
-
-    Inputs:
-        phase - string, TauP phase name
-        distance - float, epicentral distance in degrees
-        source_depth  - float, source depth in km
-        arrival_index - int, the index of the desired arrival, starting from 0
-        model - TauPyModel object
-
-    Output:
-        TauP arrival object
-    """
-
-    # Get the taup arrival for this phase
-    arrivals = model.get_ray_paths(
-        source_depth_in_km=source_depth,
-        distance_in_degree=distance,
-        phase_list=[phase],
-        receiver_depth_in_km=0.0,
-    )
-    arrivals = [x for x in arrivals if abs(x.purist_distance - distance) < 0.0001]
-    if len(arrivals) == 0:
-        vel_model_name = str(model.model.s_mod.v_mod.model_name)
-        if "'" in vel_model_name:
-            vel_model = vel_model_name.split("'")[1]
-        else:
-            vel_model = vel_model_name
-        raise PhaseError(phase, vel_model)
-
-    return arrivals[arrival_index]
-
-
-def get_correct_taup_arrival(arrival, model, extra_distance=0.0):
-    """
-    Returns a TauP arrival object in the correct form if the original is not
-
-    Inputs:
-        arrival - TauP arrival object
-        model - TauPyModel object
-        extra_distance - float, any further distance than the inputted arrival
-            to obtain the new arrival
-
-    Output:
-        TauP arrival object
-    """
-
-    # Get arrival with the same ray parameter as the input arrival
-    new_arrivals = model.get_ray_paths(
-        source_depth_in_km=arrival.source_depth,
-        distance_in_degree=arrival.distance + extra_distance,
-        phase_list=[arrival.name],
-        receiver_depth_in_km=0.0,
-    )
-    index = np.array(
-        [abs(x.ray_param - arrival.ray_param) for x in new_arrivals]
-    ).argmin()
-    new_arrival = new_arrivals[index]
-    return new_arrival
-
-
-def centre_of_planet_coefficients(arrival, model):
-    """
-    Returns coefficients when a array passes too close to the centre of the Earth.
-    When a ray passes very close to the centre of the Earth there is a step in distance which is problematic.
-    In this case then interpolate the coefficients for two nearby arrivals.
-
-    Inputs:
-        arrival - TauP arrival object
-        model - TauPyModel object
-
-    Output:
-        List of three floats, approximate ellipticity coefficients for the inputted Arrival
-    """
-
-    # Get two arrivals that do not go so close to the centre of the planet
-    arrival1 = get_correct_taup_arrival(arrival, model, extra_distance=-0.05)
-    arrival2 = get_correct_taup_arrival(arrival, model, extra_distance=-0.10)
-
-    # Get the corrections for these arrivals
-    coeffs1 = ellipticity_coefficients(arrival1, model)
-    coeffs2 = ellipticity_coefficients(arrival2, model)
-
-    # Linearly interpolate each coefficient to get final coefficients
-    coeffs = [
-        (
-            coeffs1[i]
-            + (
-                (arrival.distance - arrival1.distance)
-                / (arrival2.distance - arrival1.distance)
-            )
-            * (coeffs2[i] - coeffs1[i])
-        )
-        for i in range(len(coeffs1))
-    ]
-
-    return coeffs
-
-
 def get_dvdr_below(model, radius, wave):
     """
     Gets the value of dv/dr for that model immediately below a specified radius
@@ -330,6 +185,33 @@ def evaluate_derivative_at(layer, prop):
     raise ValueError("Unknown material property, use p, s, or d.")
 
 
+def weighted_alp2(m, theta):
+    """
+    Returns the weighted degree 2 associated Legendre polynomial for a given order and value.
+
+    Inputs:
+        m - int, order of polynomial (0, 1, or 2)
+        theta - float
+
+    Output:
+        out - float, value of weighted associated Legendre polynomial of degree 2 and order m
+              at x = cos(theta)
+    """
+
+    kronecker_0m = 1 if m == 0 else 0
+    norm = np.sqrt(
+        (2 - kronecker_0m) * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
+    )
+
+    if m == 0:
+        return norm * 0.5 * (3.0 * np.cos(theta) ** 2.0 - 1.0)
+    if m == 1:
+        return norm * 3.0 * np.cos(theta) * np.sin(theta)
+    if m == 2:
+        return norm * 3.0 * np.sin(theta) ** 2.0
+    raise ValueError("Invalid value of m")
+
+
 def ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     """
     Returns ellipticity coefficients for a given ray path
@@ -358,10 +240,6 @@ def ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     # Calculate epsilon values if they don't already exist
     if not hasattr(model.model.s_mod.v_mod, "epsilon"):
         model_epsilon(model, lod)
-
-    #########################
-    ##### Get an arrival ####
-    #########################
 
     # Check if arrival is a TauP object or a list and get arrival if needed
     if isinstance(arrival, list):
@@ -393,7 +271,7 @@ def ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
         arrival = get_correct_taup_arrival(arrival, model, extra_distance=1e-10)
 
     # Bottoming depth of ray
-    bot_dep = max([x[3] for x in arrival.path])
+    bot_dep = max([point[3] for point in arrival.path])
 
     # When the ray goes close to the centre of the Earth, the distance function has a step in it
     # This is problematic to integrate along
@@ -401,14 +279,12 @@ def ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     # values and interpolate. This produces a satisfactory approximation
     if (model.model.radius_of_planet - bot_dep) * 1e3 < 50:
         sigma = centre_of_planet_coefficients(arrival, model)
-
     else:
-        paths, waves = split_ray_path(arrival, model)
-        ray_sigma = integral_coefficients(arrival, model, paths, waves)
-        disc_sigma = discontinuity_coefficients(arrival, model, paths, waves)
+        ray_sigma = integral_coefficients(arrival, model)
+        disc_sigma = discontinuity_coefficients(arrival, model)
 
         # Sum the contribution from the ray path and the discontinuities to get final coefficients
-        sigma = [ray_sigma[x] + disc_sigma[x] for x in [0, 1, 2]]
+        sigma = [ray_sigma[m] + disc_sigma[m] for m in [0, 1, 2]]
 
     return sigma
 
@@ -481,7 +357,7 @@ def split_ray_path(arrival, model):
     return paths, waves
 
 
-def integral_coefficients(arrival, model, paths, waves):
+def integral_coefficients(arrival, model):
     """Calculate correction coefficients due to integral along ray path"""
 
     # Radius of Earth
@@ -492,6 +368,7 @@ def integral_coefficients(arrival, model, paths, waves):
 
     # Loop through path segments
     seg_ray_sigma = []
+    paths, waves = split_ray_path(arrival, model)
     for path, wave in zip(paths, waves):
 
         # Depth in m
@@ -548,8 +425,10 @@ def integral_coefficients(arrival, model, paths, waves):
     return [np.sum([s[m] for s in seg_ray_sigma]) for m in [0, 1, 2]]
 
 
-def discontinuity_coefficients(arrival, model, paths, waves):
+def discontinuity_coefficients(arrival, model):
     """Calculate correction coefficients due to discontinuities"""
+
+    paths, waves = split_ray_path(arrival, model)
 
     # Radius of Earth
     Re = model.model.radius_of_planet
@@ -571,17 +450,17 @@ def discontinuity_coefficients(arrival, model, paths, waves):
     # Get which discontinuities the phase interacts with, include bottoming depth to allow
     # cross indexing with the paths variable
     ids = [
-        (i, point[3], point[2])
+        (i, point[3], point[2])  # index, depth, distance
         for i, point in enumerate(arrival.path)
         if point[3] in assess_discs
     ]
     if arrival.source_depth not in (0, ids[0][1]):
-        ids = [(0, arrival.source_depth, 0)] + ids
+        ids = [(0, arrival.source_depth, 0.0)] + ids
     idiscs = [
         {
             "ind": x[0],
             "order": i,
-            "dep": x[1] * 1e3,
+            "d": x[1] * 1e3,
             "r": (Re - x[1]) * 1e3,
             "dist": x[2],
             "p": arrival.path[0][0],
@@ -590,14 +469,14 @@ def discontinuity_coefficients(arrival, model, paths, waves):
     ]
 
     # Loop through discontinuities and assess what is occurring
-    for d, idisc in enumerate(idiscs):
+    for i, idisc in enumerate(idiscs):
 
         # Do not sum if diffracted and this is the CMB
-        if "diff" in arrival.name and idisc["dep"] == model.model.cmb_depth * 1e3:
+        if "diff" in arrival.name and idisc["d"] == model.model.cmb_depth * 1e3:
             idisc["yn"] = False
 
         # Do not calculate for bottoming depth if this is not a discontinuity
-        elif round(idisc["dep"] * 1e-3, 5) in discs or d == 0:
+        elif round(idisc["d"] * 1e-3, ndigits=5) in discs or i == 0:
             idisc["yn"] = True
 
         # Do not sum if this is the bottoming depth
@@ -619,7 +498,7 @@ def discontinuity_coefficients(arrival, model, paths, waves):
             extra = [idisc["epsilon"] * idisc["lambda"][m] for m in [0, 1, 2]]
 
             # The surface must be treated differently due to TauP indexing constraints
-            if idisc["dep"] != 0.0 and idisc["ind"] != 0:
+            if idisc["d"] != 0.0 and idisc["ind"] != 0:
 
                 # Depths before and after interactions
                 dep0 = arrival.path[idisc["ind"] - 1][3]
@@ -651,8 +530,8 @@ def discontinuity_coefficients(arrival, model, paths, waves):
                     idisc["type"] = "refl"
 
                 # Phase before and after
-                idisc["ph_pre"] = waves[d - 1][-1]
-                idisc["ph_post"] = waves[d][0]
+                idisc["ph_pre"] = waves[i - 1][-1]
+                idisc["ph_post"] = waves[i][0]
 
                 # Deal with a transmission case
                 if idisc["type"] == "trans":
@@ -667,11 +546,11 @@ def discontinuity_coefficients(arrival, model, paths, waves):
 
                     # Velocity above and below discontinuity
                     idisc["v0"] = (
-                        v_mod.evaluate_above(idisc["dep"] / 1e3, idisc["ph_above"])[0]
+                        v_mod.evaluate_above(idisc["d"] / 1e3, idisc["ph_above"])[0]
                         * 1e3
                     )
                     idisc["v1"] = (
-                        v_mod.evaluate_below(idisc["dep"] / 1e3, idisc["ph_below"])[0]
+                        v_mod.evaluate_below(idisc["d"] / 1e3, idisc["ph_below"])[0]
                         * 1e3
                     )
 
@@ -680,7 +559,7 @@ def discontinuity_coefficients(arrival, model, paths, waves):
                     idisc["eta1"] = idisc["r"] / idisc["v1"]
 
                     # Evaluate the time difference
-                    eva = (-1.0) * (
+                    eva = -(
                         np.sqrt(idisc["eta0"] ** 2 - idisc["p"] ** 2)
                         - np.sqrt(idisc["eta1"] ** 2 - idisc["p"] ** 2)
                     )
@@ -690,11 +569,10 @@ def discontinuity_coefficients(arrival, model, paths, waves):
 
                     # Velocity below discontinuity
                     idisc["v0"] = (
-                        v_mod.evaluate_below(idisc["dep"] / 1e3, idisc["ph_pre"])[0]
-                        * 1e3
+                        v_mod.evaluate_below(idisc["d"] / 1e3, idisc["ph_pre"])[0] * 1e3
                     )
                     idisc["v1"] = (
-                        v_mod.evaluate_below(idisc["dep"] / 1e3, idisc["ph_post"])[0]
+                        v_mod.evaluate_below(idisc["d"] / 1e3, idisc["ph_post"])[0]
                         * 1e3
                     )
 
@@ -712,11 +590,10 @@ def discontinuity_coefficients(arrival, model, paths, waves):
 
                     # Velocity above discontinuity
                     idisc["v0"] = (
-                        v_mod.evaluate_above(idisc["dep"] / 1e3, idisc["ph_pre"])[0]
-                        * 1e3
+                        v_mod.evaluate_above(idisc["d"] / 1e3, idisc["ph_pre"])[0] * 1e3
                     )
                     idisc["v1"] = (
-                        v_mod.evaluate_above(idisc["dep"] / 1e3, idisc["ph_post"])[0]
+                        v_mod.evaluate_above(idisc["d"] / 1e3, idisc["ph_post"])[0]
                         * 1e3
                     )
 
@@ -725,7 +602,7 @@ def discontinuity_coefficients(arrival, model, paths, waves):
                     idisc["eta1"] = idisc["r"] / idisc["v1"]
 
                     # Evaluate the time difference
-                    eva = (-1) * (
+                    eva = -(
                         np.sqrt(idisc["eta0"] ** 2 - idisc["p"] ** 2)
                         + np.sqrt(idisc["eta1"] ** 2 - idisc["p"] ** 2)
                     )
@@ -738,7 +615,7 @@ def discontinuity_coefficients(arrival, model, paths, waves):
                     wave = waves[0][0]
                 elif idisc["ind"] == len(arrival.path) - 1:
                     # wave = waves[max(list(paths.keys())) - 1][-1]
-                    ## ALERT - have a broken something here in change from dict to list?
+                    ## ALERT - may have a broken something here in change from dict to list?
                     ## Stuart, check this
                     wave = waves[-1][-1]
 
@@ -746,9 +623,7 @@ def discontinuity_coefficients(arrival, model, paths, waves):
                 if arrival.name[0] in ["p", "s"] and idisc["ind"] == 0:
 
                     # Velocity above source
-                    idisc["v1"] = (
-                        v_mod.evaluate_above(idisc["dep"] / 1e3, wave)[0] * 1e3
-                    )
+                    idisc["v1"] = v_mod.evaluate_above(idisc["d"] / 1e3, wave)[0] * 1e3
 
                     # eta above source
                     idisc["eta1"] = idisc["r"] / idisc["v1"]
@@ -759,9 +634,7 @@ def discontinuity_coefficients(arrival, model, paths, waves):
                 # Deal with ending the ray path at the surface
                 else:
                     # Velocity below surface
-                    idisc["v1"] = (
-                        v_mod.evaluate_below(idisc["dep"] / 1e3, wave)[0] * 1e3
-                    )
+                    idisc["v1"] = v_mod.evaluate_below(idisc["d"] / 1e3, wave)[0] * 1e3
 
                     # eta below surface
                     idisc["eta1"] = idisc["r"] / idisc["v1"]
@@ -769,24 +642,24 @@ def discontinuity_coefficients(arrival, model, paths, waves):
                     # Evaluate the time difference
                     eva = (-1.0) * (
                         0 - np.sqrt(idisc["eta1"] ** 2 - idisc["p"] ** 2)
-                    )  ## ALERT -- looks odd
+                    )  ## ALERT -- looks odd, just write + ?
 
             # Deal with surface reflection
-            elif idisc["dep"] == 0.0:
+            elif idisc["d"] == 0.0:
 
                 # Assign type of interaction
                 idisc["type"] = "refl"
 
                 # Phase before and after
-                idisc["ph_pre"] = waves[d - 1][-1]
-                idisc["ph_post"] = waves[d][0]
+                idisc["ph_pre"] = waves[i - 1][-1]
+                idisc["ph_post"] = waves[i][0]
 
                 # Velocity below surface
                 idisc["v0"] = (
-                    v_mod.evaluate_below(idisc["dep"] / 1e3, idisc["ph_pre"])[0] * 1e3
+                    v_mod.evaluate_below(idisc["d"] / 1e3, idisc["ph_pre"])[0] * 1e3
                 )
                 idisc["v1"] = (
-                    v_mod.evaluate_below(idisc["dep"] / 1e3, idisc["ph_post"])[0] * 1e3
+                    v_mod.evaluate_below(idisc["d"] / 1e3, idisc["ph_post"])[0] * 1e3
                 )
 
                 # eta below surface
@@ -808,3 +681,124 @@ def discontinuity_coefficients(arrival, model, paths, waves):
     ]
 
     return disc_sigma
+
+
+def centre_of_planet_coefficients(arrival, model):
+    """
+    Returns coefficients when a array passes too close to the centre of the Earth.
+    When a ray passes very close to the centre of the Earth there is a step in distance which is problematic.
+    In this case then interpolate the coefficients for two nearby arrivals.
+
+    Inputs:
+        arrival - TauP arrival object
+        model - TauPyModel object
+
+    Output:
+        List of three floats, approximate ellipticity coefficients for the inputted Arrival
+    """
+
+    # ALERT -- feels like there should be a better way of doing this, without recalculating arrivals
+
+    # Get two arrivals that do not go so close to the centre of the planet
+    arrival1 = get_correct_taup_arrival(arrival, model, extra_distance=-0.05)
+    arrival2 = get_correct_taup_arrival(arrival, model, extra_distance=-0.10)
+
+    # Get the corrections for these arrivals
+    coeffs1 = ellipticity_coefficients(arrival1, model)
+    coeffs2 = ellipticity_coefficients(arrival2, model)
+
+    # Linearly interpolate each coefficient to get final coefficients
+    coeffs = [
+        (
+            c1
+            + (
+                (arrival.distance - arrival1.distance)
+                / (arrival2.distance - arrival1.distance)
+            )
+            * (c2 - c1)
+        )
+        for c1, c2 in zip(coeffs1, coeffs2)
+    ]
+
+    return coeffs
+
+
+def get_taup_arrival(phase, distance, source_depth, arrival_index, model):
+    """
+    Returns a TauP arrival object for the given phase, distance, depth and velocity model
+
+    Inputs:
+        phase - string, TauP phase name
+        distance - float, epicentral distance in degrees
+        source_depth  - float, source depth in km
+        arrival_index - int, the index of the desired arrival, starting from 0
+        model - TauPyModel object
+
+    Output:
+        TauP arrival object
+    """
+
+    # Get the taup arrival for this phase
+    arrivals = model.get_ray_paths(
+        source_depth_in_km=source_depth,
+        distance_in_degree=distance,
+        phase_list=[phase],
+        receiver_depth_in_km=0.0,
+    )
+    arrivals = [x for x in arrivals if abs(x.purist_distance - distance) < 0.0001]
+    if len(arrivals) == 0:
+        vel_model_name = str(model.model.s_mod.v_mod.model_name)
+        if "'" in vel_model_name:
+            vel_model = vel_model_name.split("'")[1]
+        else:
+            vel_model = vel_model_name
+        raise PhaseError(phase, vel_model)
+
+    return arrivals[arrival_index]
+
+
+# Define Exception
+class PhaseError(Exception):
+    """
+    Class for handing exception of when there is no phase arrival for the inputted geometry
+    """
+
+    def __init__(self, phase, vel_model):
+        self.message = (
+            "Phase "
+            + phase
+            + " does not arrive at specified distance in model "
+            + vel_model
+        )
+        super().__init__(self.message)
+
+    def __str__(self):
+        return self.message
+
+
+def get_correct_taup_arrival(arrival, model, extra_distance=0.0):
+    """
+    Returns a TauP arrival object in the correct form if the original is not
+
+    Inputs:
+        arrival - TauP arrival object
+        model - TauPyModel object
+        extra_distance - float, any further distance than the inputted arrival
+            to obtain the new arrival
+
+    Output:
+        TauP arrival object
+    """
+
+    # Get arrival with the same ray parameter as the input arrival
+    new_arrivals = model.get_ray_paths(
+        source_depth_in_km=arrival.source_depth,
+        distance_in_degree=arrival.distance + extra_distance,
+        phase_list=[arrival.name],
+        receiver_depth_in_km=0.0,
+    )
+    index = np.array(
+        [abs(x.ray_param - arrival.ray_param) for x in new_arrivals]
+    ).argmin()
+    new_arrival = new_arrivals[index]
+    return new_arrival
