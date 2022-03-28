@@ -34,6 +34,3 @@ Main functions for users to interact with.
 
 Other functions that are required by main.py but that the user shouldn't need to interact with during normal usage.
 
-### src/ellipticity/epsilon/*txt
-
-Text files containing the epsilon profiles with radius for models that have been initialised for the package. Inlcuded are PREM, iasp91 and ak135 and the package will create these for other models as and when they are required.

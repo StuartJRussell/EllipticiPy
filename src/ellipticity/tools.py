@@ -4,8 +4,7 @@ This file contains the functions to support the calculation of ellipticity
 corrections. All functions in this file are called by the main functions
 in the main file.
 """
-# ---------------------------------------------------------------------------
-# Import modules
+
 import warnings
 import obspy
 import numpy as np
@@ -30,14 +29,14 @@ def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
 
     Inputs:
         model - obspy.taup.tau_model.TauModel object
-        lod - float, length of day in the model in seconds
+        lod - float, length of day in seconds. Defaults to Earth value
         taper - bool, whether to taper below ICB or not. Causes problems if False
             (and True is consistent with previous works, e.g. Bullen & Haddon (1973))
         dr - float, step length in metres for discretization
 
     Output:
         Adds arrays of epsilon and radius to the model instance as attributes
-        model.s_mod.v_mod.epsilon_r and model.s_mod.v_mod.epsilon
+        model.s_mod.v_mod.epsilon and model.s_mod.v_mod.epsilon_r
     """
 
     # Angular velocity of model
@@ -96,7 +95,7 @@ def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
 
 def get_epsilon(model, radius):
     """
-    Gets the value of epsilon for that model at a specified radius
+    Gets the value of epsilon for a model at a specified radius
 
     Inputs:
         model - obspy.taup.tau_model.TauModel object
@@ -122,7 +121,7 @@ def get_epsilon(model, radius):
 
 def get_dvdr_below(model, radius, wave):
     """
-    Gets the value of dv/dr for that model immediately below a specified radius
+    Gets the value of dv/dr for a model immediately below a specified radius
 
     Inputs:
         model - obspy.taup.tau_model.TauModel object
@@ -140,7 +139,7 @@ def get_dvdr_below(model, radius, wave):
 
 def get_dvdr_above(model, radius, wave):
     """
-    Gets the value of dv/dr for that model immediately above a specified radius
+    Gets the value of dv/dr for a model immediately above a specified radius
 
     Inputs:
         model - obspy.taup.tau_model.TauModel object
@@ -365,9 +364,6 @@ def integral_coefficients(arrival, model):
     # Radius of Earth
     Re = model.radius_of_planet
 
-    # Ray parameter in sec/rad
-    ray_param = arrival.ray_param
-
     # Loop through path segments
     seg_ray_sigma = []
     paths, waves = split_ray_path(arrival, model)
@@ -418,7 +414,7 @@ def integral_coefficients(arrival, model):
         seg_ray_sigma.append(
             [
                 np.trapz((eta**3.0) * dvdr * epsilon * lamda[m], x=distance)
-                / ray_param
+                / arrival.ray_param
                 for m in [0, 1, 2]
             ]
         )
@@ -479,7 +475,7 @@ def discontinuity_coefficients(arrival, model):
 
         # Do not calculate for bottoming depth if this is not a discontinuity
         elif round(idisc["d"] * 1e-3, ndigits=5) in discs or i == 0:
-            idisc["yn"] = True
+            idisc["yn"] = True  # ALERT does rounding assume something about discs?
 
         # Do not sum if this is the bottoming depth
         else:
@@ -687,16 +683,16 @@ def discontinuity_coefficients(arrival, model):
 
 def centre_of_planet_coefficients(arrival, model):
     """
-    Returns coefficients when a array passes too close to the centre of the Earth.
+    Returns coefficients when an arrival passes too close to the centre of the Earth.
     When a ray passes very close to the centre of the Earth there is a step in distance which is problematic.
     In this case then interpolate the coefficients for two nearby arrivals.
 
     Inputs:
         arrival - TauP arrival object
-        model - TauPyModel object
+        model - obspy.taup.tau_model.TauModel object
 
     Output:
-        List of three floats, approximate ellipticity coefficients for the inputted Arrival
+        List of three floats, approximate ellipticity coefficients for the arrival
     """
 
     # ALERT -- feels like there should be a better way of doing this, without recalculating arrivals
@@ -734,7 +730,7 @@ def get_taup_arrival(phase, distance, source_depth, arrival_index, model):
         distance - float, epicentral distance in degrees
         source_depth  - float, source depth in km
         arrival_index - int, the index of the desired arrival, starting from 0
-        model - TauPyModel object
+        model - obspy.taup.tau_model.TauModel object
 
     Output:
         TauP arrival object
@@ -784,7 +780,7 @@ def get_correct_taup_arrival(arrival, model, extra_distance=0.0):
 
     Inputs:
         arrival - TauP arrival object
-        model - TauPyModel object
+        model - obspy.taup.tau_model.TauModel object
         extra_distance - float, any further distance than the inputted arrival
             to obtain the new arrival
 
