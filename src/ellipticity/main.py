@@ -1,10 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# ----------------------------------------------------------------------------
-# Created By  : Stuart Russell
-# Created Date: March 2022
-# version ='1.0'
-# ---------------------------------------------------------------------------
+# Copyright (C) 2022 Stuart Russell
 """
 This file contains the necessary function for a user to calculate an
 ellipticity correction for a seismic ray path in a given model.
