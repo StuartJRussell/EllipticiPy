@@ -1,28 +1,36 @@
 from ellipticity import ellipticity_correction
 from obspy.taup import TauPyModel
+import pytest
+
+test_data = [
+    ("ak135", "P", 124, 65, 45, 39, -0.37),
+    ("ak135", "S", 124, 65, 45, 39, -0.70),
+]
 
 
-def test_correction():
+@pytest.mark.parametrize(
+    "model_name, phase, source_depth_in_km, distance_in_degree, source_latitude, azimuth, expected_correction",
+    test_data,
+)
+def test_correction(
+    model_name,
+    phase,
+    source_depth_in_km,
+    distance_in_degree,
+    source_latitude,
+    azimuth,
+    expected_correction,
+):
     """Test code against some expected values of corrections."""
-    model = TauPyModel("ak135")
+    model = TauPyModel(model_name)
 
-    source_depth_in_km = 124
-    distance_in_degree = 65
-
-    source_latitude = 45
-    azimuth = 39
-    phase_list = ["P", "S"]
-    expected_correction = [-0.37, -0.70]  # seconds
-
-    tol = 1e-2
-
-    arrivals = model.get_ray_paths(source_depth_in_km, distance_in_degree, phase_list)
+    arrivals = model.get_ray_paths(source_depth_in_km, distance_in_degree, [phase])
     calculated_correction = ellipticity_correction(
         arrivals, azimuth, source_latitude, model
     )
 
-    for phase, expected, calculated in zip(
-        phase_list, expected_correction, calculated_correction
-    ):
-        print(phase, expected, calculated)
-        assert abs(expected - calculated) < tol
+    tol = 1e-2
+
+    print(phase, expected_correction, calculated_correction)
+
+    assert abs(expected_correction - calculated_correction) < tol
