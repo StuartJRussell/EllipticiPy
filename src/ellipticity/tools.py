@@ -29,7 +29,7 @@ def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
     Calculates a profile of ellipticity of figure (epsilon) through a planetary model.
 
     Inputs:
-        model - TauPyModel
+        model - obspy.taup.tau_model.TauModel object
         lod - float, length of day in the model in seconds
         taper - bool, whether to taper below ICB or not. Causes problems if False
             (and True is consistent with previous works, e.g. Bullen & Haddon (1973))
@@ -37,20 +37,20 @@ def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
 
     Output:
         Adds arrays of epsilon and radius to the model instance as attributes
-        model.model.s_mod.v_mod.epsilon_r and model.model.s_mod.v_mod.epsilon
+        model.s_mod.v_mod.epsilon_r and model.s_mod.v_mod.epsilon
     """
 
     # Angular velocity of model
     Omega = 2 * np.pi / lod  # s^-1
 
     # Radius of planet in m
-    a = model.model.radius_of_planet * 1e3
+    a = model.radius_of_planet * 1e3
 
     # Radii to evaluate integrals
     r = np.linspace(0, a, 1 + int(a / dr))
 
     # Get the density (in kg m^-3) at these radii
-    v_mod = model.model.s_mod.v_mod
+    v_mod = model.s_mod.v_mod
     rho = np.append(
         v_mod.evaluate_above((a - r[:-1]) / 1e3, "d") * 1e3,
         v_mod.evaluate_below(0.0, "d")[0] * 1e3,
@@ -99,7 +99,7 @@ def get_epsilon(model, radius):
     Gets the value of epsilon for that model at a specified radius
 
     Inputs:
-        model - TauPyModel object
+        model - obspy.taup.tau_model.TauModel object
         radius - float, radius in m
 
     Output:
@@ -107,8 +107,8 @@ def get_epsilon(model, radius):
     """
 
     # Epsilon and radii arrays
-    epsilon = model.model.s_mod.v_mod.epsilon
-    radii = model.model.s_mod.v_mod.epsilon_r
+    epsilon = model.s_mod.v_mod.epsilon
+    radii = model.s_mod.v_mod.epsilon_r
 
     # Get the nearest value of epsilon to the given radius
     idx = np.searchsorted(radii, radius, side="left")
@@ -125,7 +125,7 @@ def get_dvdr_below(model, radius, wave):
     Gets the value of dv/dr for that model immediately below a specified radius
 
     Inputs:
-        model - TauPyModel object
+        model - obspy.taup.tau_model.TauModel object
         radius - float, radius in m
         wave - str, wave type: 'p' or 's'
 
@@ -133,8 +133,8 @@ def get_dvdr_below(model, radius, wave):
         float, value of dv/dr
     """
 
-    Re = model.model.radius_of_planet
-    v_mod = model.model.s_mod.v_mod
+    Re = model.radius_of_planet
+    v_mod = model.s_mod.v_mod
     return -evaluate_derivative_below(v_mod, Re - radius / 1e3, wave)[0]
 
 
@@ -143,7 +143,7 @@ def get_dvdr_above(model, radius, wave):
     Gets the value of dv/dr for that model immediately above a specified radius
 
     Inputs:
-        model - TauPyModel object
+        model - obspy.taup.tau_model.TauModel object
         radius - float, radius in m
         wave - str, wave type: 'p' or 's'
 
@@ -151,8 +151,8 @@ def get_dvdr_above(model, radius, wave):
         float, value of dv/dr
     """
 
-    Re = model.model.radius_of_planet
-    v_mod = model.model.s_mod.v_mod
+    Re = model.radius_of_planet
+    v_mod = model.s_mod.v_mod
     return -evaluate_derivative_above(v_mod, Re - radius / 1e3, wave)[0]
 
 
@@ -217,13 +217,13 @@ def ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     Returns ellipticity coefficients for a given ray path
 
     Inputs:
-        arrival - EITHER a TauP arrival object
+        arrival - EITHER a TauP Arrival object
             OR a list containing [phase, distance, source_depth, index] where:
                 phase - string, TauP phase name
                 distance - float, epicentral distance in degrees
                 source_depth - float, source depth in km
                 index - int, the index of the desired arrival, starting from 0
-        model - TauPyModel object
+        model - obspy.taup.tau.TauPyModel or obspy.taup.tau_model.TauModel object
         lod - float, length of day of the model in seconds, only needed if calculating
             coefficients for a new model
 
@@ -233,12 +233,14 @@ def ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
 
     # If model is not initialised then do so
     if isinstance(model, str):
-        model = TauPyModel(model=model)
-    elif not isinstance(model, obspy.taup.tau.TauPyModel):
+        model = TauPyModel(model=model).model
+    if isinstance(model, obspy.taup.tau.TauPyModel):
+        model = model.model
+    if not isinstance(model, obspy.taup.tau_model.TauModel):
         raise TypeError("Velocity model not correct type")
 
     # Calculate epsilon values if they don't already exist
-    if not hasattr(model.model.s_mod.v_mod, "epsilon"):
+    if not hasattr(model.s_mod.v_mod, "epsilon"):
         model_epsilon(model, lod)
 
     # Check if arrival is a TauP object or a list and get arrival if needed
@@ -277,7 +279,7 @@ def ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     # This is problematic to integrate along
     # Instead, if the ray goes within 50m of the centre of the planet, calculate for nearby two
     # values and interpolate. This produces a satisfactory approximation
-    if (model.model.radius_of_planet - bot_dep) * 1e3 < 50:
+    if (model.radius_of_planet - bot_dep) * 1e3 < 50:
         sigma = centre_of_planet_coefficients(arrival, model)
     else:
         ray_sigma = integral_coefficients(arrival, model)
@@ -296,7 +298,7 @@ def split_ray_path(arrival, model):
     bot_dep = max([x[3] for x in arrival.path])
 
     # Get discontinuity depths in the model in km
-    discs = model.model.s_mod.v_mod.get_discontinuity_depths()[:-1]
+    discs = model.s_mod.v_mod.get_discontinuity_depths()[:-1]
 
     # Get wave types for each segment of ray path
     segments = arrival.name
@@ -321,8 +323,8 @@ def split_ray_path(arrival, model):
             and depth
             in [
                 0.0,
-                model.model.cmb_depth,
-                model.model.iocb_depth,
+                model.cmb_depth,
+                model.iocb_depth,
             ]  # surface, CMB, or IOCB
             and depth != arrival.path[i - 1][3]  # checking against previous depth
         ):
@@ -361,7 +363,7 @@ def integral_coefficients(arrival, model):
     """Calculate correction coefficients due to integral along ray path"""
 
     # Radius of Earth
-    Re = model.model.radius_of_planet
+    Re = model.radius_of_planet
 
     # Ray parameter in sec/rad
     ray_param = arrival.ray_param
@@ -380,7 +382,7 @@ def integral_coefficients(arrival, model):
         radius = Re * 1e3 - depth
 
         # Velocity in m/s
-        v_mod = model.model.s_mod.v_mod
+        v_mod = model.s_mod.v_mod
         v = np.array(
             [
                 v_mod.evaluate_below(d / 1e3, w)[0] * 1e3
@@ -431,13 +433,13 @@ def discontinuity_coefficients(arrival, model):
     paths, waves = split_ray_path(arrival, model)
 
     # Radius of Earth
-    Re = model.model.radius_of_planet
+    Re = model.radius_of_planet
 
     # Bottoming depth of ray
     bot_dep = max([point[3] for point in arrival.path])
 
     # Get discontinuities in the model
-    v_mod = model.model.s_mod.v_mod  # velocity model
+    v_mod = model.s_mod.v_mod  # velocity model
     discs = v_mod.get_discontinuity_depths()[:-1]
 
     # Including the bottoming depth allows cross indexing with the paths variable when
@@ -472,7 +474,7 @@ def discontinuity_coefficients(arrival, model):
     for i, idisc in enumerate(idiscs):
 
         # Do not sum if diffracted and this is the CMB
-        if "diff" in arrival.name and idisc["d"] == model.model.cmb_depth * 1e3:
+        if "diff" in arrival.name and idisc["d"] == model.cmb_depth * 1e3:
             idisc["yn"] = False
 
         # Do not calculate for bottoming depth if this is not a discontinuity
@@ -747,7 +749,7 @@ def get_taup_arrival(phase, distance, source_depth, arrival_index, model):
     )
     arrivals = [x for x in arrivals if abs(x.purist_distance - distance) < 0.0001]
     if len(arrivals) == 0:
-        vel_model_name = str(model.model.s_mod.v_mod.model_name)
+        vel_model_name = str(model.s_mod.v_mod.model_name)
         if "'" in vel_model_name:
             vel_model = vel_model_name.split("'")[1]
         else:
