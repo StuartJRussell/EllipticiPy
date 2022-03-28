@@ -55,7 +55,7 @@ def weighted_alp2(m, theta):
               at x = cos(theta)
     """
 
-    kronecker_0m = 1 if m==0 else 0
+    kronecker_0m = 1 if m == 0 else 0
     norm = np.sqrt(
         (2 - kronecker_0m) * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
     )
@@ -92,12 +92,13 @@ def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
     a = model.model.radius_of_planet * 1e3
 
     # Radii to evaluate integrals
-    r = np.linspace(0, a, 1 + int(a/dr))
+    r = np.linspace(0, a, 1 + int(a / dr))
 
     # Get the density (in kg m^-3) at these radii
+    v_mod = model.model.s_mod.v_mod
     rho = np.append(
-        model.model.s_mod.v_mod.evaluate_above((a - r[:-1]) / 1000.0, "d") * 1000.0,
-        model.model.s_mod.v_mod.evaluate_below(0.0, "d")[0] * 1000.0,
+        v_mod.evaluate_above((a - r[:-1]) / 1e3, "d") * 1e3,
+        v_mod.evaluate_below(0.0, "d")[0] * 1e3,
     )
 
     # Mass within each spherical shell
@@ -134,8 +135,8 @@ def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
     epsilon = np.insert(epsilon, 0, epsilon[0])  # add a centre of planet value
 
     # Output as model attributes
-    model.model.s_mod.v_mod.epsilon_r = r
-    model.model.s_mod.v_mod.epsilon = epsilon
+    v_mod.epsilon_r = r
+    v_mod.epsilon = epsilon
 
 
 def get_epsilon(model, radius):
@@ -402,9 +403,9 @@ def ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
         sigma = centre_of_planet_coefficients(arrival, model)
 
     else:
-        paths, wave_paths = ray_path(arrival, model)
-        ray_sigma = integral_coefficients(arrival, model, paths, wave_paths)
-        disc_sigma = discontinuity_coefficients(arrival, model, paths, wave_paths)
+        paths, waves = split_ray_path(arrival, model)
+        ray_sigma = integral_coefficients(arrival, model, paths, waves)
+        disc_sigma = discontinuity_coefficients(arrival, model, paths, waves)
 
         # Sum the contribution from the ray path and the discontinuities to get final coefficients
         sigma = [ray_sigma[x] + disc_sigma[x] for x in [0, 1, 2]]
@@ -412,21 +413,19 @@ def ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     return sigma
 
 
-def ray_path(arrival, model):
-    """Set up a ray path"""
+def split_ray_path(arrival, model):
+    """Split and label ray path according to type of wave."""
 
     # Bottoming depth of ray
     bot_dep = max([x[3] for x in arrival.path])
 
-    # Get discontinuities in the model
+    # Get discontinuity depths in the model in km
     discs = model.model.s_mod.v_mod.get_discontinuity_depths()[:-1]
 
     # Get wave types for each segment of ray path
-    phase_name = arrival.name
-    if "diff" in phase_name:
-        segments = phase_name.replace("diff", phase_name[phase_name.index("diff") - 1])
-    else:
-        segments = phase_name
+    segments = arrival.name
+    if "diff" in segments:
+        segments = segments.replace("diff", segments[segments.index("diff") - 1])
     segments = (
         segments.replace("c", "")
         .replace("i", "")
@@ -434,117 +433,133 @@ def ray_path(arrival, model):
         .replace("I", "P")
         .replace("J", "S")
     )
+
+    # Label path with wave types
     letter = 0
-    waves = []
-    for i, pathi in enumerate(arrival.path):
+    wave_labels = []
+    for i, point in enumerate(arrival.path):
+        depth = point[3]
         if (
-            i != 0
-            and i != len(arrival.path) - 1
-            and pathi[3] in [0.0, model.model.cmb_depth, model.model.iocb_depth]
-            and pathi[3] != arrival.path[i - 1][3]
+            i != 0  # not beginning
+            and i != len(arrival.path) - 1  # not end
+            and depth
+            in [
+                0.0,
+                model.model.cmb_depth,
+                model.model.iocb_depth,
+            ]  # surface, CMB, or IOCB
+            and depth != arrival.path[i - 1][3]  # checking against previous depth
         ):
             letter = letter + 1
-        waves.append(segments[letter].lower())
+        wave_labels.append(segments[letter].lower())
 
     # Split the path at discontinuities and bottoming depth
-    wave = {}
-    paths = {}
+    waves = []
+    paths = []
     count = -1
-    for i, pathi in enumerate(arrival.path):
-        if (i == 0 or pathi[3] in discs or pathi[3] == bot_dep) and i != len(
+    for i, point in enumerate(arrival.path):
+        depth = point[3]
+        if (
+            i == 0  # is beginning
+            or depth in discs  # or at a discontinuity
+            or depth == bot_dep  # or at the bottoming depth
+        ) and i != len(
             arrival.path
-        ) - 1:
+        ) - 1:  # not at the end
             count = count + 1
-            paths[count] = []
-            wave[count] = []
+            paths.append([])
+            waves.append([])
             if count != 0:
-                paths[count - 1].append(list(pathi))
-                wave[count - 1].append(waves[i - 1])
-        paths[count].append(list(pathi))
-        wave[count].append(waves[i])
-        
-    print(wave.keys())
-    print(paths.keys())
-    
-    paths = [np.array(paths[x]) for x in paths]
-    wave_paths = [np.array(wave[i]) for i, x in enumerate(paths)]
+                paths[count - 1].append(list(point))
+                waves[count - 1].append(wave_labels[i - 1])
+        paths[count].append(list(point))
+        waves[count].append(wave_labels[i])
 
-    return paths, wave_paths
+    paths = [np.array(path) for path in paths]
+    waves = [np.array(wave) for wave in waves]
+
+    return paths, waves
 
 
-def integral_coefficients(arrival, model, paths, wave_paths):
+def integral_coefficients(arrival, model, paths, waves):
     """Calculate correction coefficients due to integral along ray path"""
 
     # Radius of Earth
     Re = model.model.radius_of_planet
 
     # Ray parameter in sec/rad
-    p = arrival.ray_param
+    ray_param = arrival.ray_param
 
     # Loop through path segments
     seg_ray_sigma = []
-    for path, wave_path in zip(paths, wave_paths):
+    for path, wave in zip(paths, waves):
 
         # Depth in m
-        dep = path[:, 3] * 1e3
+        depth = path[:, 3] * 1e3
         # Remove centre of the Earth so that TauP doesn't error
-        dep[dep == Re * 1e3] = Re * 1e3 - 1
+        depth[depth == Re * 1e3] = Re * 1e3 - 1
+
         # Radius in m
-        r = Re * 1e3 - dep
+        radius = Re * 1e3 - depth
+
         # Velocity in m/s
+        v_mod = model.model.s_mod.v_mod
         v = np.array(
             [
-                model.model.s_mod.v_mod.evaluate_below(dep[i] / 1e3, wave_path[i])[
-                    0
-                ]
-                * 1e3
-                if dep[i] != max(dep)
-                else model.model.s_mod.v_mod.evaluate_above(
-                    dep[i] / 1e3, wave_path[i]
-                )[0]
-                * 1e3
-                for i in range(len(path))
+                v_mod.evaluate_below(d / 1e3, w)[0] * 1e3
+                if d != max(depth)
+                else v_mod.evaluate_above(d / 1e3, w)[0] * 1e3
+                for d, w in zip(depth, wave)
             ]
         )
-        # Gradient of v wrt r
+
+        # Gradient of v wrt r in s^-1
         dvdr = np.array(
             [
-                get_dvdr_below(model, r[i], wave_path[0])
-                if dep[i] != max(dep)
-                else get_dvdr_above(model, r[i], wave_path[0])
-                for i in range(len(path))
+                get_dvdr_below(model, r, wave[0])
+                if r != min(radius)
+                else get_dvdr_above(model, r, wave[0])
+                for r in radius
             ]
         )
-        # eta in s
-        eta = r / v
-        # epsilon
-        epsilon = np.array([get_epsilon(model, r[i]) for i in range(len(path))])
 
-        # Distance in radians
-        dist = np.array([x[2] for x in path])
+        # eta in s
+        eta = radius / v
+
+        # epsilon
+        epsilon = np.array([get_epsilon(model, r) for r in radius])
+
+        # Epicentral distance in radians
+        distance = path[:, 2]
+
         # lambda
-        lamda = [(-1.0) * (2.0 / 3.0) * weighted_alp2(x, dist) for x in [0, 1, 2]]
+        lamda = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
+
         # Do the integration
-        seg_ray_sigma.append([
-            np.sum(np.trapz((eta**3.0) * dvdr * epsilon * lamda[m], x=dist) / p)
-            for m in [0, 1, 2]
-        ])
+        seg_ray_sigma.append(
+            [
+                np.trapz((eta**3.0) * dvdr * epsilon * lamda[m], x=distance)
+                / ray_param
+                for m in [0, 1, 2]
+            ]
+        )
 
     # Sum coefficients for each segment to get total ray path contribution
-    return [np.sum([seg_ray_sigma[x][m] for x, path in enumerate(paths)]) for m in [0, 1, 2]]
+    return [np.sum([s[m] for s in seg_ray_sigma]) for m in [0, 1, 2]]
 
 
-def discontinuity_coefficients(arrival, model, paths, wave_paths):
+def discontinuity_coefficients(arrival, model, paths, waves):
     """Calculate correction coefficients due to discontinuities"""
 
     # Radius of Earth
     Re = model.model.radius_of_planet
 
     # Bottoming depth of ray
-    bot_dep = max([x[3] for x in arrival.path])
+    bot_dep = max([point[3] for point in arrival.path])
 
     # Get discontinuities in the model
-    discs = model.model.s_mod.v_mod.get_discontinuity_depths()[:-1]
+    v_mod = model.model.s_mod.v_mod  # velocity model
+    discs = v_mod.get_discontinuity_depths()[:-1]
 
     # Including the bottoming depth allows cross indexing with the paths variable when
     # the start point is not the lowest point on the ray path
@@ -556,22 +571,22 @@ def discontinuity_coefficients(arrival, model, paths, wave_paths):
     # Get which discontinuities the phase interacts with, include bottoming depth to allow
     # cross indexing with the paths variable
     ids = [
-        (i, arrival.path[i][3], arrival.path[i][2])
-        for i in range(len(arrival.path))
-        if arrival.path[i][3] in assess_discs
+        (i, point[3], point[2])
+        for i, point in enumerate(arrival.path)
+        if point[3] in assess_discs
     ]
     if arrival.source_depth not in (0, ids[0][1]):
         ids = [(0, arrival.source_depth, 0)] + ids
     idiscs = [
         {
-            "ind": ids[i][0],
+            "ind": x[0],
             "order": i,
-            "dep": ids[i][1] * 1e3,
-            "r": (Re - ids[i][1]) * 1e3,
-            "dist": ids[i][2],
+            "dep": x[1] * 1e3,
+            "r": (Re - x[1]) * 1e3,
+            "dist": x[2],
             "p": arrival.path[0][0],
         }
-        for i in range(len(ids))
+        for i, x in enumerate(ids)
     ]
 
     # Loop through discontinuities and assess what is occurring
@@ -597,14 +612,11 @@ def discontinuity_coefficients(arrival, model, paths, wave_paths):
 
             # lambda at this distance
             idisc["lambda"] = [
-                (-1.0) * (2.0 / 3.0) * weighted_alp2(x, idisc["dist"])
-                for x in [0, 1, 2]
+                -(2.0 / 3.0) * weighted_alp2(m, idisc["dist"]) for m in [0, 1, 2]
             ]
 
             # Calculate the factor
-            extra = [
-                idisc["epsilon"] * idisc["lambda"][x] for x in [0, 1, 2]
-            ]
+            extra = [idisc["epsilon"] * idisc["lambda"][m] for m in [0, 1, 2]]
 
             # The surface must be treated differently due to TauP indexing constraints
             if idisc["dep"] != 0.0 and idisc["ind"] != 0:
@@ -639,8 +651,8 @@ def discontinuity_coefficients(arrival, model, paths, wave_paths):
                     idisc["type"] = "refl"
 
                 # Phase before and after
-                idisc["ph_pre"] = wave_paths[d - 1][-1]
-                idisc["ph_post"] = wave_paths[d][0]
+                idisc["ph_pre"] = waves[d - 1][-1]
+                idisc["ph_post"] = waves[d][0]
 
                 # Deal with a transmission case
                 if idisc["type"] == "trans":
@@ -655,15 +667,11 @@ def discontinuity_coefficients(arrival, model, paths, wave_paths):
 
                     # Velocity above and below discontinuity
                     idisc["v0"] = (
-                        model.model.s_mod.v_mod.evaluate_above(
-                            idisc["dep"] / 1e3, idisc["ph_above"]
-                        )[0]
+                        v_mod.evaluate_above(idisc["dep"] / 1e3, idisc["ph_above"])[0]
                         * 1e3
                     )
                     idisc["v1"] = (
-                        model.model.s_mod.v_mod.evaluate_below(
-                            idisc["dep"] / 1e3, idisc["ph_below"]
-                        )[0]
+                        v_mod.evaluate_below(idisc["dep"] / 1e3, idisc["ph_below"])[0]
                         * 1e3
                     )
 
@@ -682,15 +690,11 @@ def discontinuity_coefficients(arrival, model, paths, wave_paths):
 
                     # Velocity below discontinuity
                     idisc["v0"] = (
-                        model.model.s_mod.v_mod.evaluate_below(
-                            idisc["dep"] / 1e3, idisc["ph_pre"]
-                        )[0]
+                        v_mod.evaluate_below(idisc["dep"] / 1e3, idisc["ph_pre"])[0]
                         * 1e3
                     )
                     idisc["v1"] = (
-                        model.model.s_mod.v_mod.evaluate_below(
-                            idisc["dep"] / 1e3, idisc["ph_post"]
-                        )[0]
+                        v_mod.evaluate_below(idisc["dep"] / 1e3, idisc["ph_post"])[0]
                         * 1e3
                     )
 
@@ -699,24 +703,20 @@ def discontinuity_coefficients(arrival, model, paths, wave_paths):
                     idisc["eta1"] = idisc["r"] / idisc["v1"]
 
                     # Evaluate the time difference
-                    eva = np.sqrt(
-                        idisc["eta0"] ** 2 - idisc["p"] ** 2
-                    ) + np.sqrt(idisc["eta1"] ** 2 - idisc["p"] ** 2)
+                    eva = np.sqrt(idisc["eta0"] ** 2 - idisc["p"] ** 2) + np.sqrt(
+                        idisc["eta1"] ** 2 - idisc["p"] ** 2
+                    )
 
                 # Deal with a topside reflection case
                 if idisc["type"] == "refl" and idisc["pre"] == "down":
 
                     # Velocity above discontinuity
                     idisc["v0"] = (
-                        model.model.s_mod.v_mod.evaluate_above(
-                            idisc["dep"] / 1e3, idisc["ph_pre"]
-                        )[0]
+                        v_mod.evaluate_above(idisc["dep"] / 1e3, idisc["ph_pre"])[0]
                         * 1e3
                     )
                     idisc["v1"] = (
-                        model.model.s_mod.v_mod.evaluate_above(
-                            idisc["dep"] / 1e3, idisc["ph_post"]
-                        )[0]
+                        v_mod.evaluate_above(idisc["dep"] / 1e3, idisc["ph_post"])[0]
                         * 1e3
                     )
 
@@ -735,39 +735,32 @@ def discontinuity_coefficients(arrival, model, paths, wave_paths):
 
                 # Assign wave type
                 if idisc["ind"] == 0:
-                    wave = wave_paths[0][0]
+                    wave = waves[0][0]
                 elif idisc["ind"] == len(arrival.path) - 1:
-                    #wave = wave_paths[max(list(paths.keys())) - 1][-1]
+                    # wave = waves[max(list(paths.keys())) - 1][-1]
                     ## ALERT - have a broken something here in change from dict to list?
                     ## Stuart, check this
-                    wave = wave_paths[-1][-1]
-
+                    wave = waves[-1][-1]
 
                 # Deal with phases that start with an upgoing segment
                 if arrival.name[0] in ["p", "s"] and idisc["ind"] == 0:
 
                     # Velocity above source
                     idisc["v1"] = (
-                        model.model.s_mod.v_mod.evaluate_above(
-                            idisc["dep"] / 1e3, wave
-                        )[0]
-                        * 1e3
+                        v_mod.evaluate_above(idisc["dep"] / 1e3, wave)[0] * 1e3
                     )
 
                     # eta above source
                     idisc["eta1"] = idisc["r"] / idisc["v1"]
 
                     # Evaluate the time difference
-                    eva = (-1.0) * np.sqrt(idisc["eta1"] ** 2 - idisc["p"] ** 2)
+                    eva = -np.sqrt(idisc["eta1"] ** 2 - idisc["p"] ** 2)
 
                 # Deal with ending the ray path at the surface
                 else:
                     # Velocity below surface
                     idisc["v1"] = (
-                        model.model.s_mod.v_mod.evaluate_below(
-                            idisc["dep"] / 1e3, wave
-                        )[0]
-                        * 1e3
+                        v_mod.evaluate_below(idisc["dep"] / 1e3, wave)[0] * 1e3
                     )
 
                     # eta below surface
@@ -776,7 +769,7 @@ def discontinuity_coefficients(arrival, model, paths, wave_paths):
                     # Evaluate the time difference
                     eva = (-1.0) * (
                         0 - np.sqrt(idisc["eta1"] ** 2 - idisc["p"] ** 2)
-                    )
+                    )  ## ALERT -- looks odd
 
             # Deal with surface reflection
             elif idisc["dep"] == 0.0:
@@ -785,21 +778,15 @@ def discontinuity_coefficients(arrival, model, paths, wave_paths):
                 idisc["type"] = "refl"
 
                 # Phase before and after
-                idisc["ph_pre"] = wave_paths[d - 1][-1]
-                idisc["ph_post"] = wave_paths[d][0]
+                idisc["ph_pre"] = waves[d - 1][-1]
+                idisc["ph_post"] = waves[d][0]
 
                 # Velocity below surface
                 idisc["v0"] = (
-                    model.model.s_mod.v_mod.evaluate_below(
-                        idisc["dep"] / 1e3, idisc["ph_pre"]
-                    )[0]
-                    * 1e3
+                    v_mod.evaluate_below(idisc["dep"] / 1e3, idisc["ph_pre"])[0] * 1e3
                 )
                 idisc["v1"] = (
-                    model.model.s_mod.v_mod.evaluate_below(
-                        idisc["dep"] / 1e3, idisc["ph_post"]
-                    )[0]
-                    * 1e3
+                    v_mod.evaluate_below(idisc["dep"] / 1e3, idisc["ph_post"])[0] * 1e3
                 )
 
                 # eta below surface
@@ -812,12 +799,12 @@ def discontinuity_coefficients(arrival, model, paths, wave_paths):
                 )
 
             # Output coefficients for this discontinuity
-            idisc["sigma"] = [extra[x] * eva for x in [0, 1, 2]]
+            idisc["sigma"] = [extra[m] * eva for m in [0, 1, 2]]
 
     # Sum the contribution to the coefficients from discontinuities
     disc_sigma = [
-        np.sum([idisc["sigma"][x] for idisc in idiscs if idisc["yn"]])
-        for x in [0, 1, 2]
+        np.sum([idisc["sigma"][m] for idisc in idiscs if idisc["yn"]])
+        for m in [0, 1, 2]
     ]
 
     return disc_sigma
