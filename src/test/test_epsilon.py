@@ -5,11 +5,11 @@ from obspy.taup import TauPyModel
 def test_epsilon():
     """Test the numerical integration for ellipticity (epsilon)"""
     model = TauPyModel("prem")
-    model_epsilon(model)
+    model_epsilon(model.model)
 
     # Calculate ellipticity at the core mantle boundary (CMB)
     cmb_radius = 3480e3
-    calculated_epsilon = get_epsilon(model, cmb_radius)
+    calculated_epsilon = get_epsilon(model.model, cmb_radius)
 
     # Expected ellipticity for PREM at the CMB, see e.g. Huang et al GJI (2001) 146 p130
     expected_epsilon = 0.002547
