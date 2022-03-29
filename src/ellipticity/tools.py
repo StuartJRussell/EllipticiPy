@@ -421,12 +421,9 @@ def discontinuity_coefficients(arrival, model):
     v_mod = model.s_mod.v_mod  # velocity model
     discs = v_mod.get_discontinuity_depths()[:-1]
 
-    # Including the bottoming depth allows cross indexing with the paths variable when
+    # Including the bottoming and source depths allows cross indexing with the paths variable when
     # the start point is not the lowest point on the ray path
-    if bot_dep == arrival.path[0][3]:
-        assess_discs = discs
-    else:
-        assess_discs = np.append(discs, bot_dep)
+    assess_discs = np.sort(np.append(discs, (bot_dep, arrival.source_depth)))
 
     # Get which discontinuities the phase interacts with, include bottoming depth to allow
     # cross indexing with the paths variable
@@ -455,14 +452,13 @@ def discontinuity_coefficients(arrival, model):
         # Do not sum if diffracted and this is the CMB
         if "diff" in arrival.name and idisc["d"] == model.cmb_depth * 1e3:
             idisc["yn"] = False
-
-        # Do not calculate for bottoming depth if this is not a discontinuity
-        elif round(idisc["d"] * 1e-3, ndigits=5) in discs or i == 0:
-            idisc["yn"] = True  # ALERT does rounding assume something about discs?
-
-        # Do not sum if this is the bottoming depth
-        else:
+            
+        elif (idisc["d"] == bot_dep * 1e3 or idisc["d"] == arrival.source_depth * 1e3) and idisc["d"] not in discs and idisc["ind"] != 0:
             idisc["yn"] = False
+
+        # Calculate if this is a true discontinuity
+        else:
+            idisc["yn"] = True
 
         # Proceed if summing this discontinuity
         if idisc["yn"]:
