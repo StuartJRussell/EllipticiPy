@@ -4,13 +4,14 @@ This file contains the necessary function for a user to calculate an
 ellipticity correction for a seismic ray path in a given model.
 """
 
+# Import modules
 import numpy as np
 from obspy.taup import TauPyModel
 from .tools import ellipticity_coefficients, correction_from_coefficients, EARTH_LOD
 
 
 def ellipticity_correction(
-    arrivals, azimuth, source_latitude, model=None, lod=EARTH_LOD
+    arrivals, azimuth, source_latitude, model = None, lod = EARTH_LOD
 ):
     """
     Returns the ellipticity correction to a 1D traveltime for a ray path in a 1D velocity model.
@@ -48,7 +49,8 @@ def ellipticity_correction(
     # Enforce that azimuth must be in range 0 to 360 degrees
     if not 0 <= azimuth <= 360:
         raise ValueError("Azimuth must be in range 0 to 360 degrees")
-
+    
+    # Calculate the ellipticity coefficients
     sigma = ellipticity_coefficients(arrivals, model, lod)
 
     # Calculate time

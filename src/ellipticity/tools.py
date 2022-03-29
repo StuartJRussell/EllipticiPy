@@ -5,16 +5,18 @@ corrections. All functions in this file are called by the main functions
 in the main file.
 """
 
+# Import modules
 import warnings
 import obspy
 import numpy as np
 from scipy.integrate import cumtrapz
 
+# Constants
 EARTH_LOD = 86164.0905  # s, length of day
 G = 6.67408e-11  # m^3 kg^-1 s^-2, universal gravitational constant
 
 
-def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
+def model_epsilon(model, lod = EARTH_LOD, taper = True, dr = 100):
     """
     Calculates a profile of ellipticity of figure (epsilon) through a planetary model.
 
@@ -148,19 +150,21 @@ def get_dvdr_above(model, radius, wave):
 
 def evaluate_derivative_below(model, depth, prop):
     """Evaluate depth derivative of material property at bottom of a velocity layer."""
+    
     layer = model.layers[model.layer_number_below(depth)]
     return evaluate_derivative_at(layer, prop)
 
 
 def evaluate_derivative_above(model, depth, prop):
     """Evaluate depth derivative of material property at top of a velocity layer."""
+    
     layer = model.layers[model.layer_number_above(depth)]
     return evaluate_derivative_at(layer, prop)
 
 
 def evaluate_derivative_at(layer, prop):
     """Evaluate depth derivative of material property in a velocity layer."""
-
+    
     thick = layer["bot_depth"] - layer["top_depth"]
     prop = prop.lower()
     if prop == "p":
@@ -202,7 +206,7 @@ def weighted_alp2(m, theta):
     raise ValueError("Invalid value of m")
 
 
-def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
+def ellipticity_coefficients(arrivals, model = None, lod = EARTH_LOD):
     """
     Returns ellipticity coefficients for a set of arrivals
 
@@ -222,7 +226,7 @@ def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
     return [individual_ellipticity_coefficients(arr, model, lod) for arr in arrivals]
 
 
-def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
+def individual_ellipticity_coefficients(arrival, model, lod = EARTH_LOD):
     """
     Returns ellipticity coefficients for a given ray path
 
@@ -294,16 +298,16 @@ def split_ray_path(arrival, model):
             letter = letter + 1
         wave_labels.append(segments[letter].lower())
 
-    # Split the path at discontinuities and bottoming depth
+    # Split the path at discontinuities, bottoming depth and source depth
     waves = []
     paths = []
     count = -1
     for i, point in enumerate(arrival.path):
         depth = point[3]
         if (
-            i == 0  # is beginning
-            or depth in discs  # or at a discontinuity
+            depth in discs  # Is at a discontinuity
             or depth == bot_dep  # or at the bottoming depth
+            or depth == arrival.source_depth # or the source depth (beginning)
         ) and i != len(
             arrival.path
         ) - 1:  # not at the end
