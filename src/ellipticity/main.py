@@ -16,18 +16,12 @@ def ellipticity_correction(
     Returns the ellipticity correction to a 1D traveltime for a ray path in a 1D velocity model.
 
     Inputs:
-        arrivals - EITHER a TauP Arrivals object
-            OR a list containing [phase, distance, source_depth, index] where:
-                phase - string, TauP phase name
-                distance - float, epicentral distance in degrees
-                source_depth - float, source depth in km
-                index - int, the index of the desired arrival, starting from 0
+        arrivals - a TauP Arrivals object
         azimuth - float, azimuth from source to receiver in degrees from N
         source_latitude - float, source latitude in degrees
 
     Optional inputs:
-        model - TauPyModel object OR string defining the path to a velocity model usable by TauP
-            If None (default), model is taken from TauP Arrivals object
+        model - obspy.taup.tau.TauPyModel or obspy.taup.tau_model.TauModel object
         lod - float, length of day of the model. Defaults to Earth value
 
     Output:
@@ -62,7 +56,4 @@ def ellipticity_correction(
         [correction_from_coefficients(sig, azimuth, source_latitude) for sig in sigma]
     )
 
-    # Return value or list
-    if len(dt) == 1:
-        return dt[0]
     return dt

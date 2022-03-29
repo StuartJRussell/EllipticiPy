@@ -11,14 +11,6 @@ import numpy as np
 from obspy.taup import TauPyModel
 from scipy.integrate import cumtrapz
 
-# ---------------------------------------------------------------------------
-# Suppress warnings
-warnings.filterwarnings(
-    "ignore",
-    message="Resizing a TauP array inplace failed due to the existence of other references to the array, creating a new array. See Obspy #2280.",
-)
-# ---------------------------------------------------------------------------
-
 EARTH_LOD = 86164.0905  # s, length of day
 G = 6.67408e-11  # m^3 kg^-1 s^-2, universal gravitational constant
 
@@ -216,12 +208,7 @@ def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
     Returns ellipticity coefficients for a set of arrivals
 
     Inputs:
-        arrivals - EITHER a TauP Arrivals object
-            OR a list containing [phase, distance, source_depth, index] where:
-                phase - string, TauP phase name
-                distance - float, epicentral distance in degrees
-                source_depth - float, source depth in km
-                index - int, the index of the desired arrival, starting from 0
+        arrivals - a TauP Arrivals object
         model - obspy.taup.tau.TauPyModel or obspy.taup.tau_model.TauModel object
         lod - float, length of day of the model in seconds, only needed if calculating
             coefficients for a new model
@@ -233,25 +220,7 @@ def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
     if model is None:
         model = arrivals.model
 
-    # Assess whether input is arrivals or coefficients
-    if isinstance(arrivals, obspy.taup.helper_classes.Arrival) or (
-        isinstance(arrivals, list)
-        and len(arrivals) == 4
-        and isinstance(arrivals[0], str)
-    ):
-        return [individual_ellipticity_coefficients(arrivals, model, lod)]
-
-    # If a list of arrivals then deal with that
-    if isinstance(arrivals, obspy.taup.tau.Arrivals) or (
-        isinstance(arrivals, list)
-        and isinstance(arrivals[0], obspy.taup.helper_classes.Arrival)
-    ):
-        return [
-            individual_ellipticity_coefficients(arr, model, lod) for arr in arrivals
-        ]
-
-    else:
-        raise TypeError("Arrival not correctly defined")
+    return [individual_ellipticity_coefficients(arr, model, lod) for arr in arrivals]
 
 
 def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
@@ -259,12 +228,7 @@ def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     Returns ellipticity coefficients for a given ray path
 
     Inputs:
-        arrival - EITHER a TauP Arrival object
-            OR a list containing [phase, distance, source_depth, index] where:
-                phase - string, TauP phase name
-                distance - float, epicentral distance in degrees
-                source_depth - float, source depth in km
-                index - int, the index of the desired arrival, starting from 0
+        arrival - a TauP Arrival object
         model - obspy.taup.tau.TauPyModel or obspy.taup.tau_model.TauModel object
         lod - float, length of day of the model in seconds, only needed if calculating
             coefficients for a new model
@@ -285,50 +249,11 @@ def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     if not hasattr(model.s_mod.v_mod, "epsilon"):
         model_epsilon(model, lod)
 
-    # Check if arrival is a TauP object or a list and get arrival if needed
-    if isinstance(arrival, list):
+    ray_sigma = integral_coefficients(arrival, model)
+    disc_sigma = discontinuity_coefficients(arrival, model)
 
-        # Call an arrival, this will error if the phase input is unrealistic
-        # Ideally users should use TauP Arrivals as inputs but some may not
-        arrival = get_taup_arrival(
-            arrival[0], arrival[1], arrival[2], arrival[3], model
-        )
-
-    elif (
-        isinstance(arrival, obspy.taup.helper_classes.Arrival) and arrival.path is None
-    ):
-
-        # Call an arrival that has a ray path
-        # Ideally users should use the ObsPy TauP get_ray_paths() to get their arrivals,
-        # but if they haven't then this will fix it
-        warnings.warn(
-            "Arrival does not have ray path, in future please input the correct arrival for greater efficiency"
-        )
-        arrival = get_correct_taup_arrival(arrival, model)
-
-    # If ray parameter is zero then this is problematic, so adjust the distance slightly
-    if arrival.distance == 0.0:
-
-        # Call an arrival that has non-zero ray parameter
-        # We can't integrate the ray when the ray parameter is zero, but the integral does converge
-        # when the distance is zero so just add a tiny bit of distance
-        arrival = get_correct_taup_arrival(arrival, model, extra_distance=1e-10)
-
-    # Bottoming depth of ray
-    bot_dep = max([point[3] for point in arrival.path])
-
-    # When the ray goes close to the centre of the Earth, the distance function has a step in it
-    # This is problematic to integrate along
-    # Instead, if the ray goes within 50m of the centre of the planet, calculate for nearby two
-    # values and interpolate. This produces a satisfactory approximation
-    if (model.radius_of_planet - bot_dep) * 1e3 < 50:
-        sigma = centre_of_planet_coefficients(arrival, model)
-    else:
-        ray_sigma = integral_coefficients(arrival, model)
-        disc_sigma = discontinuity_coefficients(arrival, model)
-
-        # Sum the contribution from the ray path and the discontinuities to get final coefficients
-        sigma = [ray_sigma[m] + disc_sigma[m] for m in [0, 1, 2]]
+    # Sum the contribution from the ray path and the discontinuities to get final coefficients
+    sigma = [ray_sigma[m] + disc_sigma[m] for m in [0, 1, 2]]
 
     return sigma
 
@@ -739,46 +664,6 @@ def discontinuity_coefficients(arrival, model):
     return disc_sigma
 
 
-def centre_of_planet_coefficients(arrival, model):
-    """
-    Returns coefficients when an arrival passes too close to the centre of the Earth.
-    When a ray passes very close to the centre of the Earth there is a step in distance which is problematic.
-    In this case then interpolate the coefficients for two nearby arrivals.
-
-    Inputs:
-        arrival - TauP arrival object
-        model - obspy.taup.tau_model.TauModel object
-
-    Output:
-        List of three floats, approximate ellipticity coefficients for the arrival
-    """
-
-    # ALERT -- feels like there should be a better way of doing this, without recalculating arrivals
-
-    # Get two arrivals that do not go so close to the centre of the planet
-    arrival1 = get_correct_taup_arrival(arrival, model, extra_distance=-0.05)
-    arrival2 = get_correct_taup_arrival(arrival, model, extra_distance=-0.10)
-
-    # Get the corrections for these arrivals
-    coeffs1 = individual_ellipticity_coefficients(arrival1, model)
-    coeffs2 = individual_ellipticity_coefficients(arrival2, model)
-
-    # Linearly interpolate each coefficient to get final coefficients
-    coeffs = [
-        (
-            c1
-            + (
-                (arrival.distance - arrival1.distance)
-                / (arrival2.distance - arrival1.distance)
-            )
-            * (c2 - c1)
-        )
-        for c1, c2 in zip(coeffs1, coeffs2)
-    ]
-
-    return coeffs
-
-
 def correction_from_coefficients(coefficients, azimuth, source_latitude):
     """Obtain an ellipticity correction given the coefficients."""
 
@@ -792,106 +677,3 @@ def correction_from_coefficients(coefficients, azimuth, source_latitude):
         coefficients[m] * weighted_alp2(m, colatitude) * np.cos(m * azimuth)
         for m in [0, 1, 2]
     )
-
-
-## ALERT -- I don't think we should calculate taup arrivals in this code. Can code below be removed somehow?
-
-# Define Exception
-class PhaseError(Exception):
-    """
-    Class for handing exception of when there is no phase arrival for the inputted geometry
-    """
-
-    def __init__(self, phase, vel_model):
-        self.message = (
-            "Phase "
-            + phase
-            + " does not arrive at specified distance in model "
-            + vel_model
-        )
-        super().__init__(self.message)
-
-    def __str__(self):
-        return self.message
-
-
-def get_taup_arrival(phase, distance, source_depth, arrival_index, model):
-    """
-    Returns a TauP arrival object for the given phase, distance, depth and velocity model
-
-    Inputs:
-        phase - string, TauP phase name
-        distance - float, epicentral distance in degrees
-        source_depth  - float, source depth in km
-        arrival_index - int, the index of the desired arrival, starting from 0
-        model - obspy.taup.tau_model.TauModel object
-
-    Output:
-        TauP arrival object
-    """
-
-    # Get the taup arrival for this phase
-    # arrivals = model.get_ray_paths(
-    # source_depth_in_km=source_depth,
-    # distance_in_degree=distance,
-    # phase_list=[phase],
-    # receiver_depth_in_km=0.0,
-    # )
-    from obspy.taup.taup_path import TauPPath
-    from obspy.taup.tau import Arrivals
-
-    rp = TauPPath(model, [phase], source_depth, distance, 0.0)
-    rp.run()
-    arrivals = Arrivals(sorted(rp.arrivals, key=lambda x: x.time), model=model)
-
-    arrivals = [x for x in arrivals if abs(x.purist_distance - distance) < 0.0001]
-    if len(arrivals) == 0:
-        vel_model_name = str(model.s_mod.v_mod.model_name)
-        if "'" in vel_model_name:
-            vel_model = vel_model_name.split("'")[1]
-        else:
-            vel_model = vel_model_name
-        raise PhaseError(phase, vel_model)
-
-    return arrivals[arrival_index]
-
-
-def get_correct_taup_arrival(arrival, model, extra_distance=0.0):
-    """
-    Returns a TauP arrival object in the correct form if the original is not
-
-    Inputs:
-        arrival - TauP arrival object
-        model - obspy.taup.tau_model.TauModel object
-        extra_distance - float, any further distance than the inputted arrival
-            to obtain the new arrival
-
-    Output:
-        TauP arrival object
-    """
-
-    # Get arrival with the same ray parameter as the input arrival
-    # new_arrivals = model.get_ray_paths(
-    # source_depth_in_km=arrival.source_depth,
-    # distance_in_degree=arrival.distance + extra_distance,
-    # phase_list=[arrival.name],
-    # receiver_depth_in_km=0.0,
-    # )
-    from obspy.taup.taup_path import TauPPath
-    from obspy.taup.tau import Arrivals
-
-    rp = TauPPath(
-        model,
-        [arrival.name],
-        arrival.source_depth,
-        arrival.distance + extra_distance,
-        0.0,
-    )
-    rp.run()
-    new_arrivals = Arrivals(sorted(rp.arrivals, key=lambda x: x.time), model=model)
-
-    index = np.array(
-        [abs(x.ray_param - arrival.ray_param) for x in new_arrivals]
-    ).argmin()
-    new_arrival = new_arrivals[index]
-    return new_arrival
