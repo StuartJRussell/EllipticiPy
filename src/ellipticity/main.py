@@ -11,7 +11,7 @@ from .tools import ellipticity_coefficients, correction_from_coefficients, EARTH
 
 
 def ellipticity_correction(
-    arrivals, azimuth, source_latitude, model = None, lod = EARTH_LOD
+    arrivals, azimuth, source_latitude, model=None, lod=EARTH_LOD
 ):
     """
     Returns the ellipticity correction to a 1D traveltime for a ray path in a 1D velocity model.

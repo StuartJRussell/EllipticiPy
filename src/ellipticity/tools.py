@@ -16,7 +16,7 @@ EARTH_LOD = 86164.0905  # s, length of day
 G = 6.67408e-11  # m^3 kg^-1 s^-2, universal gravitational constant
 
 
-def model_epsilon(model, lod = EARTH_LOD, taper = True, dr = 100):
+def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
     """
     Calculates a profile of ellipticity of figure (epsilon) through a planetary model.
 
@@ -206,7 +206,7 @@ def weighted_alp2(m, theta):
     raise ValueError("Invalid value of m")
 
 
-def ellipticity_coefficients(arrivals, model = None, lod = EARTH_LOD):
+def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
     """
     Returns ellipticity coefficients for a set of arrivals
 
@@ -226,7 +226,7 @@ def ellipticity_coefficients(arrivals, model = None, lod = EARTH_LOD):
     return [individual_ellipticity_coefficients(arr, model, lod) for arr in arrivals]
 
 
-def individual_ellipticity_coefficients(arrival, model, lod = EARTH_LOD):
+def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     """
     Returns ellipticity coefficients for a given ray path
 
