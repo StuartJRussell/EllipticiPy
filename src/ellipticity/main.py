@@ -6,7 +6,7 @@ ellipticity correction for a seismic ray path in a given model.
 
 import obspy
 import numpy as np
-from .tools import ellipticity_coefficients, weighted_alp2, EARTH_LOD
+from .tools import ellipticity_coefficients, correction_from_coefficients, EARTH_LOD
 
 
 def ellipticity_correction(
@@ -55,29 +55,11 @@ def ellipticity_correction(
     if not 0 <= azimuth <= 360:
         raise ValueError("Azimuth must be in range 0 to 360 degrees")
 
-    # Deal with the case where the inputs are coefficients
-    if (
-        isinstance(arrivals, list)
-        and len(arrivals) == 3
-        and isinstance(arrivals[0], float)
-    ):
-        sigma = [arrivals]  # Assign coefficients
-
-    else:
-        sigma = ellipticity_coefficients(arrivals, model, lod)
-
-    # Convert azimuth to radians
-    az = np.radians(azimuth)
-
-    # Convert latitude to colatitude
-    evcla = np.radians(90 - source_latitude)
+    sigma = ellipticity_coefficients(arrivals, model, lod)
 
     # Calculate time
     dt = np.array(
-        [
-            sum(sig[m] * weighted_alp2(m, evcla) * np.cos(m * az) for m in [0, 1, 2])
-            for sig in sigma
-        ]
+        [correction_from_coefficients(sig, azimuth, source_latitude) for sig in sigma]
     )
 
     # Return value or list

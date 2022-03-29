@@ -764,6 +764,21 @@ def centre_of_planet_coefficients(arrival, model):
     return coeffs
 
 
+def correction_from_coefficients(coefficients, azimuth, source_latitude):
+    """Obtain an ellipticity correction given the coefficients."""
+
+    # Convert latitude to colatitude
+    colatitude = np.radians(90 - source_latitude)
+
+    # Convert azimuth to radians
+    azimuth = np.radians(azimuth)
+
+    return sum(
+        coefficients[m] * weighted_alp2(m, colatitude) * np.cos(m * azimuth)
+        for m in [0, 1, 2]
+    )
+
+
 ## ALERT -- I don't think we should calculate taup arrivals in this code. Can code below be removed somehow?
 
 # Define Exception
