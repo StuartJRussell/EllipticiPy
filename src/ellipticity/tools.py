@@ -203,11 +203,11 @@ def weighted_alp2(m, theta):
     )
 
     if m == 0:
-        return norm * 0.5 * (3.0 * np.cos(theta) ** 2.0 - 1.0)
+        return norm * 0.5 * (3.0 * np.cos(theta) ** 2 - 1.0)
     if m == 1:
         return norm * 3.0 * np.cos(theta) * np.sin(theta)
     if m == 2:
-        return norm * 3.0 * np.sin(theta) ** 2.0
+        return norm * 3.0 * np.sin(theta) ** 2
     raise ValueError("Invalid value of m")
 
 
@@ -454,13 +454,28 @@ def integral_coefficients(arrival, model):
         lamda = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
 
         # Do the integration
-        seg_ray_sigma.append(
-            [
+        p = arrival.ray_param
+        if abs(p) > 1e-8:  # some tolerance, not sure what to set
+            integral = [
                 np.trapz((eta**3.0) * dvdr * epsilon * lamda[m], x=distance)
                 / arrival.ray_param
                 for m in [0, 1, 2]
             ]
-        )
+        else:
+            # When ray parameter close to vertical, switch to doing a radial integral
+            sign = np.sign(radius[-1] - radius[0])
+            prefactor = (
+                1 + 0.5 * (p / eta) ** 2
+            )  # binomial approximation of eta / np.sqrt(eta**2 - p**2)
+            integral = [
+                np.trapz(
+                    sign * prefactor * (v**-2) * dvdr * radius * epsilon * lamda[m],
+                    x=radius,
+                )
+                for m in [0, 1, 2]
+            ]
+
+        seg_ray_sigma.append(integral)
 
     # Sum coefficients for each segment to get total ray path contribution
     return [np.sum([s[m] for s in seg_ray_sigma]) for m in [0, 1, 2]]

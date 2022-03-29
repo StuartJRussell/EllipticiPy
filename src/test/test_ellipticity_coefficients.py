@@ -22,8 +22,7 @@ def test_ellipticity_coefficients(
         source_depth_in_km, distance_in_degree, phase_list=[phase]
     )
 
-    arrival = arrivals[0]
-    calculated_sigma = ellipticity_coefficients(arrival, model)
+    calculated_sigma = ellipticity_coefficients(arrivals)[0]
 
     diff = np.array(calculated_sigma) - np.array(expected_sigma)
 
