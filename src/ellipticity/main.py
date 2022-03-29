@@ -4,8 +4,8 @@ This file contains the necessary function for a user to calculate an
 ellipticity correction for a seismic ray path in a given model.
 """
 
-import obspy
 import numpy as np
+from obspy.taup import TauPyModel
 from .tools import ellipticity_coefficients, correction_from_coefficients, EARTH_LOD
 
 
@@ -38,7 +38,7 @@ def ellipticity_correction(
     # Get model from arrivals object if model is None
     if model is None:
         model = arrivals.model
-    if isinstance(model, obspy.taup.TauPyModel):
+    if isinstance(model, TauPyModel):
         model = model.model
 
     # Enforce that event latitude must be in range -90 to 90 degrees
@@ -57,3 +57,21 @@ def ellipticity_correction(
     )
 
     return dt
+
+
+def ellip_corr(
+    model_name,
+    phase,
+    source_depth_in_km,
+    distance_in_degree,
+    azimuth,
+    source_latitude,
+    lod=EARTH_LOD,
+):
+    """Simple wrapper of ellipticity_correction for those who don't want to directly call obspy."""
+    model = TauPyModel(model_name)
+    arrivals = model.get_ray_paths(
+        source_depth_in_km, distance_in_degree, phase_list=[phase]
+    )
+    dt = ellipticity_correction(arrivals, azimuth, source_latitude, lod=EARTH_LOD)
+    return dt[0]

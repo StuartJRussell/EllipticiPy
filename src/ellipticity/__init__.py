@@ -17,4 +17,4 @@ __version__ = "1.1"
 __author__ = "Stuart Russell"
 
 # Import functions
-from .main import ellipticity_correction
+from .main import ellipticity_correction, ellip_corr

@@ -8,7 +8,6 @@ in the main file.
 import warnings
 import obspy
 import numpy as np
-from obspy.taup import TauPyModel
 from scipy.integrate import cumtrapz
 
 EARTH_LOD = 86164.0905  # s, length of day
@@ -237,9 +236,6 @@ def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
         list of three floats, ellipticity coefficients
     """
 
-    # If model is not initialised then do so
-    if isinstance(model, str):
-        model = TauPyModel(model=model).model
     if isinstance(model, obspy.taup.tau.TauPyModel):
         model = model.model
     if not isinstance(model, obspy.taup.tau_model.TauModel):
