@@ -453,7 +453,7 @@ def discontinuity_coefficients(arrival, model):
         if "diff" in arrival.name and idisc["d"] == model.cmb_depth * 1e3:
             idisc["yn"] = False
             
-        elif (idisc["d"] == bot_dep * 1e3 or idisc["d"] == arrival.source_depth * 1e3) and idisc["d"] not in discs and idisc["ind"] != 0:
+        elif (idisc["d"] == bot_dep * 1e3 or idisc["d"] == arrival.source_depth * 1e3) and idisc["d"] * 1e-3 not in discs and idisc["ind"] != 0:
             idisc["yn"] = False
 
         # Calculate if this is a true discontinuity
