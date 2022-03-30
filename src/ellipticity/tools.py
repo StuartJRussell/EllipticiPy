@@ -267,20 +267,19 @@ def split_ray_path(arrival, model):
     # Get discontinuity depths in the model in km
     discs = model.s_mod.v_mod.get_discontinuity_depths()[:-1]
 
-    # Get and run TauPTime object
-    ob = obspy.taup.taup_time.TauPTime(model, [arrival.name], depth = arrival.source_depth, degrees = arrival.distance, receiver_depth=0.0)
-    ob.run()
+    # Get SeismicPhase object
+    ph = obspy.taup.seismic_phase.SeismicPhase(arrival.name, model.depth_correct(arrival.source_depth))
 
     # Get the branches of the TauModel
-    branches = [(x.top_depth, x.bot_depth) for x in ob.depth_corrected_model.tau_branches[0]]
+    branches = [(x.top_depth, x.bot_depth) for x in model.depth_correct(arrival.source_depth).tau_branches[0]]
 
     # Get which branch is the the outer core branch
     OC_branch = branches.index((model.cmb_depth, model.iocb_depth))
 
     # Wave for each branch in sequence
     # ObsPy doesnt' always assign the correct wave type for the outer core, so enforce P wave
-    branch_seq = ob.phases[0].branch_seq
-    wave_type = [ob.phases[0].wave_type[i] if branch_seq[i] != OC_branch else True for i in range(len(ob.phases[0].wave_type))]
+    branch_seq = ph.branch_seq
+    wave_type = [ph.wave_type[i] if branch_seq[i] != OC_branch else True for i in range(len(ph.wave_type))]
 
     # Split the path at discontinuities, bottoming depth and source depth
     paths = []
