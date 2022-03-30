@@ -267,39 +267,22 @@ def split_ray_path(arrival, model):
     # Get discontinuity depths in the model in km
     discs = model.s_mod.v_mod.get_discontinuity_depths()[:-1]
 
-    # Get wave types for each segment of ray path
-    segments = arrival.name
-    if "diff" in segments:
-        segments = segments.replace("diff", segments[segments.index("diff") - 1])
-    segments = (
-        segments.replace("c", "")
-        .replace("i", "")
-        .replace("K", "P")
-        .replace("I", "P")
-        .replace("J", "S")
-    )
+    # Get and run TauPTime object
+    ob = obspy.taup.taup_time.TauPTime(model, [arrival.name], depth = arrival.source_depth, degrees = arrival.distance, receiver_depth=0.0)
+    ob.run()
 
-    # Label path with wave types
-    letter = 0
-    wave_labels = []
-    for i, point in enumerate(arrival.path):
-        depth = point[3]
-        if (
-            i != 0  # not beginning
-            and i != len(arrival.path) - 1  # not end
-            and depth
-            in [
-                0.0,
-                model.cmb_depth,
-                model.iocb_depth,
-            ]  # surface, CMB, or IOCB
-            and depth != arrival.path[i - 1][3]  # checking against previous depth
-        ):
-            letter = letter + 1
-        wave_labels.append(segments[letter].lower())
+    # Get the branches of the TauModel
+    branches = [(x.top_depth, x.bot_depth) for x in ob.depth_corrected_model.tau_branches[0]]
+
+    # Get which branch is the the outer core branch
+    OC_branch = branches.index((model.cmb_depth, model.iocb_depth))
+
+    # Wave for each branch in sequence
+    # ObsPy doesnt' always assign the correct wave type for the outer core, so enforce P wave
+    branch_seq = ob.phases[0].branch_seq
+    wave_type = [ob.phases[0].wave_type[i] if branch_seq[i] != OC_branch else True for i in range(len(ob.phases[0].wave_type))]
 
     # Split the path at discontinuities, bottoming depth and source depth
-    waves = []
     paths = []
     count = -1
     for i, point in enumerate(arrival.path):
@@ -313,15 +296,26 @@ def split_ray_path(arrival, model):
         ) - 1:  # not at the end
             count = count + 1
             paths.append([])
-            waves.append([])
             if count != 0:
                 paths[count - 1].append(list(point))
-                waves[count - 1].append(wave_labels[i - 1])
         paths[count].append(list(point))
-        waves[count].append(wave_labels[i])
-
     paths = [np.array(path) for path in paths]
-    waves = [np.array(wave) for wave in waves]
+    
+    # If diffracted then assess where the diffractions are and insert wave type
+    if 'diff' in arrival.name:
+        
+        # Lower mantle branch
+        LM_branch = branches.index((discs[np.where(discs == model.cmb_depth)[0][0] - 1], model.cmb_depth))
+        
+        # Diffracted path is between the lower mantle mantle legs
+        LM_legs = np.where(np.array(branch_seq) == LM_branch)[0]
+        
+        # For each pair insert a wave type into teh list
+        for ind in LM_legs[1::2]:
+            wave_type.insert(ind, wave_type[ind - 1])
+    
+    # Make arrays of wave types
+    waves = [np.array(len(paths[i]) * ['p']) if wave_type[i] else np.array(len(paths[i]) * ['s']) for i in range(len(paths))]
 
     return paths, waves
 
