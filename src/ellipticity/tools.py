@@ -300,8 +300,11 @@ def split_ray_path(arrival, model):
         paths[count].append(list(point))
     paths = [np.array(path) for path in paths]
     
+    # Remove path segments with zero distance - this happens for PnS phases due to a quirk of ObsPy TauP
+    paths = [x for x in paths if len(x) > 2 or x[0][2] != x[1][2]]
+    
     # If diffracted then assess where the diffractions are and insert wave type
-    if 'diff' in arrival.name:
+    if "diff" in arrival.name:
         
         # Lower mantle branch
         LM_branch = branches.index((discs[np.where(discs == model.cmb_depth)[0][0] - 1], model.cmb_depth))
@@ -324,14 +327,17 @@ def integral_coefficients(arrival, model):
 
     # Radius of Earth
     Re = model.radius_of_planet
+    
+    # Split the ray path
+    paths, waves = split_ray_path(arrival, model)
 
     # Loop through path segments
     seg_ray_sigma = []
-    paths, waves = split_ray_path(arrival, model)
     for path, wave in zip(paths, waves):
 
         # Depth in m
         depth = path[:, 3] * 1e3
+        
         # Remove centre of the Earth so that TauP doesn't error
         depth[depth == Re * 1e3] = Re * 1e3 - 1
 
@@ -401,11 +407,15 @@ def integral_coefficients(arrival, model):
 
 def discontinuity_coefficients(arrival, model):
     """Calculate correction coefficients due to discontinuities"""
-
+    
+    # Split the ray path
     paths, waves = split_ray_path(arrival, model)
 
     # Radius of Earth
     Re = model.radius_of_planet
+
+    #Continuous ray path
+    arrival_path = np.vstack([paths[i][:-1] if i != len(paths) -1 else paths[i]for i in range(len(paths))])
 
     # Bottoming depth of ray
     bot_dep = max([point[3] for point in arrival.path])
@@ -422,11 +432,12 @@ def discontinuity_coefficients(arrival, model):
     # cross indexing with the paths variable
     ids = [
         (i, point[3], point[2])  # index, depth, distance
-        for i, point in enumerate(arrival.path)
+        for i, point in enumerate(arrival_path)
         if point[3] in assess_discs
     ]
     if arrival.source_depth not in (0, ids[0][1]):
         ids = [(0, arrival.source_depth, 0.0)] + ids
+
     idiscs = [
         {
             "ind": x[0],
@@ -434,7 +445,7 @@ def discontinuity_coefficients(arrival, model):
             "d": x[1] * 1e3,
             "r": (Re - x[1]) * 1e3,
             "dist": x[2],
-            "p": arrival.path[0][0],
+            "p": arrival_path[0][0],
         }
         for i, x in enumerate(ids)
     ]
@@ -467,35 +478,29 @@ def discontinuity_coefficients(arrival, model):
             # Calculate the factor
             extra = [idisc["epsilon"] * idisc["lambda"][m] for m in [0, 1, 2]]
 
-            # The surface must be treated differently due to TauP indexing constraints
+            # The surface must be treated differently due to ObsPy TauP indexing constraints
             if idisc["d"] != 0.0 and idisc["ind"] != 0:
 
                 # Depths before and after interactions
-                dep0 = arrival.path[idisc["ind"] - 1][3]
-                dep1 = arrival.path[idisc["ind"]][3]
-                dep2 = arrival.path[idisc["ind"] + 1][3]
+                dep0 = arrival_path[idisc["ind"] - 1][3]
+                dep1 = arrival_path[idisc["ind"]][3]
+                dep2 = arrival_path[idisc["ind"] + 1][3]
 
                 # Direction before interaction
                 if dep0 < dep1:
                     idisc["pre"] = "down"
-                elif dep0 == dep1:
-                    idisc["pre"] = "diff"
                 else:
                     idisc["pre"] = "up"
 
                 # Direction after interaction
                 if dep1 < dep2:
                     idisc["post"] = "down"
-                elif dep1 == dep2:
-                    idisc["post"] = "diff"
                 else:
                     idisc["post"] = "up"
 
                 # Reflection or transmission
                 if idisc["pre"] == idisc["post"]:
                     idisc["type"] = "trans"
-                elif "diff" in [idisc["pre"], idisc["post"]]:
-                    idisc["type"] = "diff"
                 else:
                     idisc["type"] = "refl"
 
@@ -578,12 +583,12 @@ def discontinuity_coefficients(arrival, model):
                     )
 
             # Deal with source depth and also end point
-            elif idisc["ind"] == 0 or idisc["ind"] == len(arrival.path) - 1:
+            elif idisc["ind"] == 0 or idisc["ind"] == len(arrival_path) - 1:
 
                 # Assign wave type
                 if idisc["ind"] == 0:
                     wave = waves[0][0]
-                elif idisc["ind"] == len(arrival.path) - 1:
+                elif idisc["ind"] == len(arrival_path) - 1:
                     # wave = waves[max(list(paths.keys())) - 1][-1]
                     ## ALERT - may have a broken something here in change from dict to list?
                     ## Stuart, check this
@@ -649,7 +654,7 @@ def discontinuity_coefficients(arrival, model):
         np.sum([idisc["sigma"][m] for idisc in idiscs if idisc["yn"]])
         for m in [0, 1, 2]
     ]
-
+    
     return disc_sigma
 
 
