@@ -364,29 +364,18 @@ def integral_coefficients(arrival, model):
         # lambda
         lamda = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
 
+        # Calculate vertical slowness
+        y = eta**2 - arrival.ray_param**2
+        sign = np.sign(y[-1] - y[0])  # figure out if going up or down
+        vertical_slowness = np.sqrt(abs(y))*(y>0)  # in s
+
         # Do the integration
-        p = arrival.ray_param
-        # If ray parameter below threshold then integrate over radius
-        # Threshold based on testing
-        if abs(p) > 1e-3:
-            integral = [
-                np.trapz((eta**3.0) * dvdr * epsilon * lamda[m], x=distance)
-                / arrival.ray_param
-                for m in [0, 1, 2]
-            ]
-        else:
-            # When ray parameter close to vertical, switch to doing a radial integral
-            sign = np.sign(radius[-1] - radius[0])
-            prefactor = (
-                1 + 0.5 * (p / eta) ** 2
-            )  # binomial approximation of eta / np.sqrt(eta**2 - p**2)
-            integral = [
+        q = v**-1 * dvdr * radius        
+        integral = [
                 np.trapz(
-                    sign * prefactor * (v**-2) * dvdr * radius * epsilon * lamda[m],
-                    x=radius,
-                )
-                for m in [0, 1, 2]
-            ]
+                    (q / (1.-q)) * epsilon * sign * lamda[m],
+                    x=vertical_slowness)
+                for m in [0, 1, 2]]
 
         seg_ray_sigma.append(integral)
 
