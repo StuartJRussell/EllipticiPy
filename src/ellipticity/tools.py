@@ -366,7 +366,9 @@ def integral_coefficients(arrival, model):
 
         # Do the integration
         p = arrival.ray_param
-        if abs(p) > 1e-8:  # some tolerance, not sure what to set
+        # If ray parameter below threshold then integrate over radius
+        # Threshold based on testing
+        if abs(p) > 1e-3:
             integral = [
                 np.trapz((eta**3.0) * dvdr * epsilon * lamda[m], x=distance)
                 / arrival.ray_param
