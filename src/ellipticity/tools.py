@@ -300,21 +300,8 @@ def split_ray_path(arrival, model):
         paths[count].append(list(point))
     paths = [np.array(path) for path in paths]
     
-    # Remove path segments with zero distance - this happens for PnS phases due to a quirk of ObsPy TauP
-    paths = [x for x in paths if len(x) > 2 or x[0][2] != x[1][2]]
-    
-    # If diffracted then assess where the diffractions are and insert wave type
-    if "diff" in arrival.name:
-        
-        # Lower mantle branch
-        LM_branch = branches.index((discs[np.where(discs == model.cmb_depth)[0][0] - 1], model.cmb_depth))
-        
-        # Diffracted path is between the lower mantle mantle legs
-        LM_legs = np.where(np.array(branch_seq) == LM_branch)[0]
-        
-        # For each pair insert a wave type into teh list
-        for ind in LM_legs[1::2]:
-            wave_type.insert(ind, wave_type[ind - 1])
+    # Remove path segments with zero change in distance or zero change in depth
+    paths = [x for x in paths if len(x) > 2 or not (x[0][2] == x[1][2] or x[0][3] == x[1][3])]
     
     # Make arrays of wave types
     waves = [np.array(len(paths[i]) * ['p']) if wave_type[i] else np.array(len(paths[i]) * ['s']) for i in range(len(paths))]

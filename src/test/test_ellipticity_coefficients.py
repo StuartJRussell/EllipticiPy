@@ -34,7 +34,7 @@ def test_ellipticity_coefficients(
     diff = np.array(calculated_sigma) - np.array(expected_sigma)
 
     # Allow a tolerence of 2e-2
-    tol = 2e-2
+    tol = 3e-2
 
     print(phase, expected_sigma, calculated_sigma)
 
