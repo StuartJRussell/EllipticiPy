@@ -309,8 +309,9 @@ def split_ray_path(arrival, model):
     paths = [np.array(path) for path in paths]
 
     # Remove path segments with zero change in distance or zero change in depth
+    # Except if the ray parameter is zero as these phases are vertical
     paths = [
-        x for x in paths if len(x) > 2 or not (x[0][2] == x[1][2] or x[0][3] == x[1][3])
+        x for x in paths if len(x) > 2 or not ((x[0][2] == x[1][2] and arrival.ray_param != 0.) or x[0][3] == x[1][3])
     ]
 
     # Make arrays of wave types
