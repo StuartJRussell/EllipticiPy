@@ -5,9 +5,10 @@ corrections. All functions in this file are called by the main functions
 in the main file.
 """
 
-import obspy
 import numpy as np
 from scipy.integrate import cumtrapz
+
+import obspy
 
 # Constants
 EARTH_LOD = 86164.0905  # s, length of day
@@ -18,15 +19,16 @@ def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
     """
     Calculates a profile of ellipticity of figure (epsilon) through a planetary model.
 
-    Inputs:
-        model - obspy.taup.tau_model.TauModel object
-        lod - float, length of day in seconds. Defaults to Earth value
-        taper - bool, whether to taper below ICB or not. Causes problems if False
-            (and True is consistent with previous works, e.g. Bullen & Haddon (1973))
-        dr - float, step length in m for discretization
-
-    Output:
-        Adds arrays of epsilon and depth to the model instance as attributes
+    :param model: The tau model object
+    :type model: :class:`obspy.taup.tau_model.TauModel`
+    :param lod: length of day in seconds. Defaults to Earth value
+    :type lod: float
+    :param taper: whether to taper below ICB or not. Causes problems if False
+        (and True is consistent with previous works, e.g. Bullen & Haddon (1973))
+    :type taper: false
+    :param dr: step length in m for discretization
+    :type dr: float
+    :returns: Adds arrays of epsilon and depth to the model instance as attributes
         model.s_mod.v_mod.epsilon and model.s_mod.v_mod.epsilon_d
     """
 
@@ -86,14 +88,14 @@ def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
 
 def get_epsilon(model, depth):
     """
-    Gets the value of epsilon for a model at a specified depth
+    Gets ellipticity of figure for a model at a specified depth.
 
-    Inputs:
-        model - obspy.taup.tau_model.TauModel object
-        depth - float, depth in km
-
-    Output:
-        float, value of epsilon
+    :param model: The tau model object
+    :type model: :class:`obspy.taup.tau_model.TauModel`
+    :param depth: depth in km
+    :type depth: float
+    :returns: value of epsilon, ellipticity of figure
+    :rtype: float
     """
 
     # Epsilon and d arrays
@@ -110,21 +112,27 @@ def get_epsilon(model, depth):
 
 
 def evaluate_derivative_below(model, depth, prop):
-    """Evaluate depth derivative of material property at bottom of a velocity layer."""
+    """
+    Evaluate depth derivative of material property at bottom of a velocity layer.
+    """
 
     layer = model.layers[model.layer_number_below(depth)]
     return evaluate_derivative_at(layer, prop)
 
 
 def evaluate_derivative_above(model, depth, prop):
-    """Evaluate depth derivative of material property at top of a velocity layer."""
+    """
+    Evaluate depth derivative of material property at top of a velocity layer.
+    """
 
     layer = model.layers[model.layer_number_above(depth)]
     return evaluate_derivative_at(layer, prop)
 
 
 def evaluate_derivative_at(layer, prop):
-    """Evaluate depth derivative of material property in a velocity layer."""
+    """
+    Evaluate depth derivative of material property in a velocity layer.
+    """
 
     thick = layer["bot_depth"] - layer["top_depth"]
     prop = prop.lower()
@@ -142,15 +150,15 @@ def evaluate_derivative_at(layer, prop):
 
 def weighted_alp2(m, theta):
     """
-    Returns the weighted degree 2 associated Legendre polynomial for a given order and value.
+    The weighted degree 2 associated Legendre polynomial for a given order and value.
 
-    Inputs:
-        m - int, order of polynomial (0, 1, or 2)
-        theta - float
-
-    Output:
-        out - float, value of weighted associated Legendre polynomial of degree 2 and order m
-              at x = cos(theta)
+    :param m: order of polynomial (0, 1, or 2)
+    :type m: int
+    :param theta: angle
+    :type theta: float
+    :returns: value of weighted associated Legendre polynomial of degree 2
+        and order m at x = cos(theta)
+    :rtype: float
     """
 
     kronecker_0m = 1 if m == 0 else 0
@@ -169,16 +177,27 @@ def weighted_alp2(m, theta):
 
 def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
     """
-    Returns ellipticity coefficients for a set of arrivals
+    Ellipticity coefficients for a set of arrivals.
 
-    Inputs:
-        arrivals - a TauP Arrivals object
-        model - obspy.taup.tau.TauPyModel or obspy.taup.tau_model.TauModel object
-        lod - float, length of day of the model in seconds, only needed if calculating
-            coefficients for a new model
+    :param arrivals: TauP Arrivals object with ray paths calculated.
+    :type arrivals: :class:`obspy.taup.tau.Arrivals`
+    :param model: optional, model used to calculate the arrivals
+    :type model: :class:`obspy.taup.tau.TauPyModel` or
+                 :class:`obspy.taup.tau_model.TauModel`
+    :param lod: optional, length of day in seconds. Defaults to Earth value
+    :type lod: float
+    :returns: list of lists of three floats, ellipticity coefficients
+    :rtype: list[list]
 
-    Output:
-        list of lists of three floats, ellipticity coefficients
+    Usage:
+
+    >>> from obspy.taup import TauPyModel
+    >>> from ellipticity.tools import ellipticity_coefficients
+    >>> model = TauPyModel('prem')
+    >>> arrivals = model.get_ray_paths(source_depth_in_km = 124,
+        distance_in_degree = 65, phase_list = ['pPKiKP'])
+    >>> ellipticity_coefficients(arrivals)
+    [[-0.9323682254592675, -0.6888598392172868, -0.8824096866702915]]
     """
 
     if model is None:
@@ -189,16 +208,16 @@ def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
 
 def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     """
-    Returns ellipticity coefficients for a given ray path
+    Ellipticity coefficients for a single ray path.
 
-    Inputs:
-        arrival - a TauP Arrival object
-        model - obspy.taup.tau.TauPyModel or obspy.taup.tau_model.TauModel object
-        lod - float, length of day of the model in seconds, only needed if calculating
-            coefficients for a new model
-
-    Output:
-        list of three floats, ellipticity coefficients
+    :param arrivals: TauP Arrival object with ray path calculated.
+    :type arrivals: :class:`obspy.taup.helper_classes.Arrival`
+    :param model: Tau model used to calculate the arrival
+    :type model: :class:`obspy.taup.tau_model.TauModel`
+    :param lod: optional, length of day in seconds. Defaults to Earth value
+    :type lod: float
+    :returns: list of three floats, ellipticity coefficients
+    :rtype: list
     """
 
     if isinstance(model, obspy.taup.tau.TauPyModel):
@@ -220,7 +239,9 @@ def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
 
 
 def split_ray_path(arrival, model):
-    """Split and label ray path according to type of wave."""
+    """
+    Split and label ray path according to type of wave.
+    """
 
     # Bottoming depth of ray
     bot_dep = max([x[3] for x in arrival.path])
@@ -284,7 +305,9 @@ def split_ray_path(arrival, model):
 
 
 def integral_coefficients(arrival, model):
-    """Calculate correction coefficients due to integral along ray path"""
+    """
+    Ellipticity coefficients due to integral along ray path.
+    """
 
     # Split the ray path
     paths, waves = split_ray_path(arrival, model)
@@ -351,7 +374,9 @@ def integral_coefficients(arrival, model):
 
 
 def discontinuity_coefficients(arrival, model):
-    """Calculate correction coefficients due to discontinuities"""
+    """
+    Ellipticity coefficients due to discontinuities.
+    """
 
     # Split the ray path
     paths, waves = split_ray_path(arrival, model)
@@ -425,7 +450,9 @@ def discontinuity_coefficients(arrival, model):
 
 
 def correction_from_coefficients(coefficients, azimuth, source_latitude):
-    """Obtain an ellipticity correction given the coefficients."""
+    """
+    Ellipticity correction given the ellipticity coefficients.
+    """
 
     # Convert latitude to colatitude
     colatitude = np.radians(90 - source_latitude)

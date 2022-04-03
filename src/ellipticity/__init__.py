@@ -1,8 +1,14 @@
-# Copyright (C) 2022 Stuart Russell
 """
 Ellipticity toolkit
 ===================
-A Python package for the calculation of ellipticity corrections for seismic phases in planetary models
+
+:copyright:
+    Stuart Russell
+:license:
+    GNU Lesser General Public License, Version 3
+    (https://www.gnu.org/copyleft/lesser.html)
+
+A Python package for the calculation of ellipticity corrections for seismic phases in planetary models.
 
 When publishing work produced with this package please cite the following publication:
 INSERT PAPER HERE
