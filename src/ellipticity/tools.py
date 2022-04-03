@@ -5,8 +5,6 @@ corrections. All functions in this file are called by the main functions
 in the main file.
 """
 
-# Import modules
-import warnings
 import obspy
 import numpy as np
 from scipy.integrate import cumtrapz
@@ -267,28 +265,6 @@ def split_ray_path(arrival, model):
     # Get discontinuity depths in the model in km
     discs = model.s_mod.v_mod.get_discontinuity_depths()[:-1]
 
-    # Get SeismicPhase object
-    ph = obspy.taup.seismic_phase.SeismicPhase(
-        arrival.name, model.depth_correct(arrival.source_depth)
-    )
-
-    # Get the branches of the TauModel
-    branches = [
-        (x.top_depth, x.bot_depth)
-        for x in model.depth_correct(arrival.source_depth).tau_branches[0]
-    ]
-
-    # Get which branch is the the outer core branch
-    OC_branch = branches.index((model.cmb_depth, model.iocb_depth))
-
-    # Wave for each branch in sequence
-    # ObsPy doesnt' always assign the correct wave type for the outer core, so enforce P wave
-    branch_seq = ph.branch_seq
-    wave_type = [
-        ph.wave_type[i] if branch_seq[i] != OC_branch else True
-        for i in range(len(ph.wave_type))
-    ]
-
     # Split the path at discontinuities, bottoming depth and source depth
     paths = []
     count = -1
@@ -311,16 +287,34 @@ def split_ray_path(arrival, model):
     # Remove path segments with zero change in distance or zero change in depth
     # Except if the ray parameter is zero as these phases are vertical
     paths = [
-        x for x in paths if len(x) > 2 or not ((x[0][2] == x[1][2] and arrival.ray_param != 0.) or x[0][3] == x[1][3])
+        x
+        for x in paths
+        if len(x) > 2
+        or not ((x[0][2] == x[1][2] and arrival.ray_param != 0.0) or x[0][3] == x[1][3])
+    ]
+
+    # Get SeismicPhase object
+    ph = arrival.phase
+
+    # Get the branches of the TauModel
+    branches = [
+        (x.top_depth, x.bot_depth)
+        for x in model.depth_correct(arrival.source_depth).tau_branches[0]
+    ]
+
+    # Get which branch is the the outer core branch
+    OC_branch = branches.index((model.cmb_depth, model.iocb_depth))
+
+    # Wave for each branch in sequence
+    # ObsPy doesnt' always assign the correct wave type for the outer core, so enforce P wave
+    branch_seq = ph.branch_seq
+    wave_type = [
+        ph.wave_type[i] if branch_seq[i] != OC_branch else True
+        for i in range(len(ph.wave_type))
     ]
 
     # Make arrays of wave types
-    waves = [
-        np.array(len(paths[i]) * ["p"])
-        if wave_type[i]
-        else np.array(len(paths[i]) * ["s"])
-        for i in range(len(paths))
-    ]
+    waves = ["p" if wave_type[i] else "s" for i in range(len(paths))]
 
     return paths, waves
 
@@ -348,19 +342,19 @@ def integral_coefficients(arrival, model):
         v_mod = model.s_mod.v_mod
         v = np.array(
             [
-                v_mod.evaluate_below(d, w)[0]
+                v_mod.evaluate_below(d, wave)[0]
                 if d != max(depth)
-                else v_mod.evaluate_above(d, w)[0]
-                for d, w in zip(depth, wave)
+                else v_mod.evaluate_above(d, wave)[0]
+                for d in depth
             ]
         )
 
         # Gradient of v wrt r in s^-1
         dvdr = np.array(
             [
-                get_dvdr_below(model, r, wave[0])
+                get_dvdr_below(model, r, wave)
                 if r != min(radius)
-                else get_dvdr_above(model, r, wave[0])
+                else get_dvdr_above(model, r, wave)
                 for r in radius
             ]
         )
@@ -380,12 +374,12 @@ def integral_coefficients(arrival, model):
         # Calculate vertical slowness
         y = eta**2 - arrival.ray_param**2
         sign = np.sign(y[-1] - y[0])  # figure out if going up or down
-        vertical_slowness = np.sqrt(abs(y)) * (y > 0)  # in s
+        vertical_slowness = np.sqrt(y * (y > 0))  # in s
 
         # Do the integration
-        q = v**-1 * dvdr * radius
+        s = v**-1 * dvdr * radius
         integral = [
-            np.trapz((q / (1.0 - q)) * epsilon * sign * lamda[m], x=vertical_slowness)
+            np.trapz((s / (1.0 - s)) * epsilon * sign * lamda[m], x=vertical_slowness)
             for m in [0, 1, 2]
         ]
 
@@ -401,9 +395,6 @@ def discontinuity_coefficients(arrival, model):
     # Split the ray path
     paths, waves = split_ray_path(arrival, model)
 
-    # Radius of planet in km
-    Re = model.radius_of_planet
-
     # Continuous ray path
     arrival_path = np.vstack(
         [paths[i][:-1] if i != len(paths) - 1 else paths[i] for i in range(len(paths))]
@@ -418,7 +409,7 @@ def discontinuity_coefficients(arrival, model):
 
     # Including the bottoming and source depths allows cross indexing with the paths variable when
     # the start point is not the lowest point on the ray path
-    assess_discs = np.sort(np.append(discs, (bot_dep, arrival.source_depth)))
+    assess_discs = np.append(discs, (bot_dep, arrival.source_depth, arrival.receiver_depth))
 
     # Get which discontinuities the phase interacts with, include bottoming depth to allow
     # cross indexing with the paths variable
@@ -427,204 +418,62 @@ def discontinuity_coefficients(arrival, model):
         for i, point in enumerate(arrival_path)
         if point[3] in assess_discs
     ]
-    if arrival.source_depth not in (0, ids[0][1]):
-        ids = [(0, arrival.source_depth, 0.0)] + ids
 
-    idiscs = [
-        {
-            "ind": x[0],
-            "order": i,
-            "d": x[1],
-            "r": Re - x[1],
-            "dist": x[2],
-            "p": arrival_path[0][0],
-        }
-        for i, x in enumerate(ids)
-    ]
+    ray_param = arrival_path[0][0]
+    sigmas = []
+    for i, x in enumerate(ids):
+        ind = x[0]
+        depth = x[1]
+        distance = x[2]
+        radius = model.radius_of_planet - depth
 
-    # Loop through discontinuities and assess what is occurring
-    for i, idisc in enumerate(idiscs):
-
-        # Do not sum if diffracted and this is the CMB
-        if "diff" in arrival.name and idisc["d"] == model.cmb_depth:
-            idisc["yn"] = False
-
-        elif (
-            (idisc["d"] == bot_dep or idisc["d"] == arrival.source_depth)
-            and idisc["d"] not in discs
-            and idisc["ind"] != 0
-        ):
-            idisc["yn"] = False
-
-        # Calculate if this is a true discontinuity
+        # Depth and phases pre, source is a special case
+        if ind == 0:
+            depth_pre = depth
+            phase_pre = waves[i]
         else:
-            idisc["yn"] = True
+            depth_pre = arrival_path[ind - 1][3]
+            phase_pre = waves[i - 1]
 
-        # Proceed if summing this discontinuity
-        if idisc["yn"]:
+        # Depth and phases post, receiver is a special case
+        if ind == len(arrival_path) - 1:
+            depth_post = depth
+            phase_post = waves[i - 1]
+        else:
+            depth_post = arrival_path[ind + 1][3]
+            phase_post = waves[i]
 
-            # epsilon at this depth
-            idisc["epsilon"] = get_epsilon(model, idisc["r"])
+        def f(depth_p, phase_p):
+            if depth_p >= depth:
+                v = v_mod.evaluate_below(depth, phase_p)[0]
+            else:
+                v = v_mod.evaluate_above(depth, phase_p)[0]
 
-            # lambda at this distance
-            idisc["lambda"] = [
-                -(2.0 / 3.0) * weighted_alp2(m, idisc["dist"]) for m in [0, 1, 2]
-            ]
+            eta = radius / v
+            y = eta**2 - ray_param**2
+            vertical_slowness = np.sqrt(y * (y > 0))
 
-            # Calculate the factor
-            extra = [idisc["epsilon"] * idisc["lambda"][m] for m in [0, 1, 2]]
+            if depth_p == depth:
+                vertical_slowness = 0.0
 
-            # The surface must be treated differently due to ObsPy TauP indexing constraints
-            if idisc["d"] != 0.0 and idisc["ind"] != 0:
+            # above/below signs, positive if above
+            sign = np.sign(depth - depth_p)
+            return -sign * vertical_slowness
 
-                # Depths before and after interactions
-                dep0 = arrival_path[idisc["ind"] - 1][3]
-                dep1 = arrival_path[idisc["ind"]][3]
-                dep2 = arrival_path[idisc["ind"] + 1][3]
+        pre = f(depth_pre, phase_pre)
+        post = f(depth_post, phase_post)
 
-                # Direction before interaction
-                if dep0 < dep1:
-                    idisc["pre"] = "down"
-                else:
-                    idisc["pre"] = "up"
+        # epsilon at this depth
+        epsilon = get_epsilon(model, radius)
 
-                # Direction after interaction
-                if dep1 < dep2:
-                    idisc["post"] = "down"
-                else:
-                    idisc["post"] = "up"
+        # lambda at this distance
+        lamda = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
 
-                # Reflection or transmission
-                if idisc["pre"] == idisc["post"]:
-                    idisc["type"] = "trans"
-                else:
-                    idisc["type"] = "refl"
-
-                # Phase before and after
-                idisc["ph_pre"] = waves[i - 1][-1]
-                idisc["ph_post"] = waves[i][0]
-
-                # Deal with a transmission case
-                if idisc["type"] == "trans":
-
-                    # Phase above
-                    if idisc["pre"] == "down":
-                        idisc["ph_above"] = idisc["ph_pre"]
-                        idisc["ph_below"] = idisc["ph_post"]
-                    elif idisc["pre"] == "up":
-                        idisc["ph_above"] = idisc["ph_post"]
-                        idisc["ph_below"] = idisc["ph_pre"]
-
-                    # Velocity above and below discontinuity
-                    idisc["v0"] = v_mod.evaluate_above(idisc["d"], idisc["ph_above"])[0]
-                    idisc["v1"] = v_mod.evaluate_below(idisc["d"], idisc["ph_below"])[0]
-
-                    # eta above and below discontinuity
-                    idisc["eta0"] = idisc["r"] / idisc["v0"]
-                    idisc["eta1"] = idisc["r"] / idisc["v1"]
-
-                    # Evaluate the time difference
-                    eva = -(
-                        np.sqrt(idisc["eta0"] ** 2 - idisc["p"] ** 2)
-                        - np.sqrt(idisc["eta1"] ** 2 - idisc["p"] ** 2)
-                    )
-
-                # Deal with an underside reflection case
-                if idisc["type"] == "refl" and idisc["pre"] == "up":
-
-                    # Velocity below discontinuity
-                    idisc["v0"] = v_mod.evaluate_below(idisc["d"], idisc["ph_pre"])[0]
-                    idisc["v1"] = v_mod.evaluate_below(idisc["d"], idisc["ph_post"])[0]
-
-                    # eta below discontinuity
-                    idisc["eta0"] = idisc["r"] / idisc["v0"]
-                    idisc["eta1"] = idisc["r"] / idisc["v1"]
-
-                    # Evaluate the time difference
-                    eva = np.sqrt(idisc["eta0"] ** 2 - idisc["p"] ** 2) + np.sqrt(
-                        idisc["eta1"] ** 2 - idisc["p"] ** 2
-                    )
-
-                # Deal with a topside reflection case
-                if idisc["type"] == "refl" and idisc["pre"] == "down":
-
-                    # Velocity above discontinuity
-                    idisc["v0"] = v_mod.evaluate_above(idisc["d"], idisc["ph_pre"])[0]
-                    idisc["v1"] = v_mod.evaluate_above(idisc["d"], idisc["ph_post"])[0]
-
-                    # eta above discontinuity
-                    idisc["eta0"] = idisc["r"] / idisc["v0"]
-                    idisc["eta1"] = idisc["r"] / idisc["v1"]
-
-                    # Evaluate the time difference
-                    eva = -(
-                        np.sqrt(idisc["eta0"] ** 2 - idisc["p"] ** 2)
-                        + np.sqrt(idisc["eta1"] ** 2 - idisc["p"] ** 2)
-                    )
-
-            # Deal with source depth and also end point
-            elif idisc["ind"] == 0 or idisc["ind"] == len(arrival_path) - 1:
-
-                # Assign wave type
-                if idisc["ind"] == 0:
-                    wave = waves[0][0]
-                elif idisc["ind"] == len(arrival_path) - 1:
-                    wave = waves[-1][-1]
-
-                # Deal with phases that start with an upgoing segment
-                if arrival.name[0] in ["p", "s"] and idisc["ind"] == 0:
-
-                    # Velocity above source
-                    idisc["v1"] = v_mod.evaluate_above(idisc["d"], wave)[0]
-
-                    # eta above source
-                    idisc["eta1"] = idisc["r"] / idisc["v1"]
-
-                    # Evaluate the time difference
-                    eva = -np.sqrt(idisc["eta1"] ** 2 - idisc["p"] ** 2)
-
-                # Deal with ending the ray path at the surface
-                else:
-                    # Velocity below surface
-                    idisc["v1"] = v_mod.evaluate_below(idisc["d"], wave)[0]
-
-                    # eta below surface
-                    idisc["eta1"] = idisc["r"] / idisc["v1"]
-
-                    # Evaluate the time difference
-                    eva = np.sqrt(idisc["eta1"] ** 2 - idisc["p"] ** 2)
-
-            # Deal with surface reflection
-            elif idisc["d"] == 0.0:
-
-                # Assign type of interaction
-                idisc["type"] = "refl"
-
-                # Phase before and after
-                idisc["ph_pre"] = waves[i - 1][-1]
-                idisc["ph_post"] = waves[i][0]
-
-                # Velocity below surface
-                idisc["v0"] = v_mod.evaluate_below(idisc["d"], idisc["ph_pre"])[0]
-                idisc["v1"] = v_mod.evaluate_below(idisc["d"], idisc["ph_post"])[0]
-
-                # eta below surface
-                idisc["eta0"] = idisc["r"] / idisc["v0"]
-                idisc["eta1"] = idisc["r"] / idisc["v1"]
-
-                # Evaluate time difference
-                eva = np.sqrt(idisc["eta0"] ** 2 - idisc["p"] ** 2) + np.sqrt(
-                    idisc["eta1"] ** 2 - idisc["p"] ** 2
-                )
-
-            # Output coefficients for this discontinuity
-            idisc["sigma"] = [extra[m] * eva for m in [0, 1, 2]]
+        # Output coefficients for this discontinuity
+        sigmas.append([epsilon * lamda[m] * (pre + post) for m in [0, 1, 2]])
 
     # Sum the contribution to the coefficients from discontinuities
-    disc_sigma = [
-        np.sum([idisc["sigma"][m] for idisc in idiscs if idisc["yn"]])
-        for m in [0, 1, 2]
-    ]
+    disc_sigma = [np.sum([s[m] for s in sigmas]) for m in [0, 1, 2]]
 
     return disc_sigma
 
