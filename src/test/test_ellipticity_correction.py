@@ -30,7 +30,7 @@ def test_correction(
     model = TauPyModel(model_name)
 
     arrivals = model.get_ray_paths(source_depth_in_km, distance_in_degree, [phase])
-    calculated_correction = ellipticity_correction(arrivals, azimuth, source_latitude)
+    calculated_correction = ellipticity_correction(arrivals, azimuth, source_latitude)[0]
 
     tol = 1e-2
 
