@@ -8,7 +8,7 @@ def test_epsilon():
     model_epsilon(model.model)
 
     # Calculate ellipticity at the core mantle boundary (CMB)
-    cmb_depth = 2891. # km
+    cmb_depth = 2891.0  # km
     calculated_epsilon = get_epsilon(model.model, cmb_depth)
 
     # Expected ellipticity for PREM at the CMB, see e.g. Huang et al GJI (2001) 146 p130

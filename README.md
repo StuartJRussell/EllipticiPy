@@ -20,7 +20,7 @@ Software requirements of this package.
 
 ### LICENSE
 
-License for this package - standard MIT license.
+License for this package - standard LGPL license.
 
 ### pyproject.toml and setup.cfg
 
