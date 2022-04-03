@@ -283,15 +283,9 @@ def split_ray_path(arrival, model):
                 paths[count - 1].append(list(point))
         paths[count].append(list(point))
     paths = [np.array(path) for path in paths]
-
-    # Remove path segments with zero change in distance or zero change in depth
-    # Except if the ray parameter is zero as these phases are vertical
-    paths = [
-        x
-        for x in paths
-        if len(x) > 2
-        or not ((x[0][2] == x[1][2] and arrival.ray_param != 0.0) or x[0][3] == x[1][3])
-    ]
+    
+    # Label the paths that are diffracted rays
+    diffracted = [np.all(p[:,3] == p[0,3]) for p in paths]
 
     # Get SeismicPhase object
     ph = arrival.phase
@@ -303,19 +297,24 @@ def split_ray_path(arrival, model):
     ]
 
     # Get which branch is the the outer core branch
-    OC_branch = branches.index((model.cmb_depth, model.iocb_depth))
+    oc_branch = branches.index((model.cmb_depth, model.iocb_depth))
 
     # Wave for each branch in sequence
     # ObsPy doesnt' always assign the correct wave type for the outer core, so enforce P wave
-    branch_seq = ph.branch_seq
-    wave_type = [
-        ph.wave_type[i] if branch_seq[i] != OC_branch else True
-        for i in range(len(ph.wave_type))
-    ]
+    wave_type = [wt if ph.branch_seq[i] != oc_branch else True
+        for i, wt in enumerate(ph.wave_type)]
+    wave_type = ["p" if wt else "s" for wt in wave_type]
 
-    # Make arrays of wave types
-    waves = ["p" if wave_type[i] else "s" for i in range(len(paths))]
-
+    waves = []
+    j = 0
+    for i, path in enumerate(paths):
+        if diffracted[i]:
+            # Set diffracted segments to p, but they won't make a contribution.
+            waves.append("p")
+        else:
+            waves.append(wave_type[j])
+            j = j + 1
+    
     return paths, waves
 
 
@@ -395,52 +394,36 @@ def discontinuity_coefficients(arrival, model):
     # Split the ray path
     paths, waves = split_ray_path(arrival, model)
 
-    # Continuous ray path
-    arrival_path = np.vstack(
-        [paths[i][:-1] if i != len(paths) - 1 else paths[i] for i in range(len(paths))]
-    )
+    # Velocity model
+    v_mod = model.s_mod.v_mod  
 
-    # Bottoming depth of ray
-    bot_dep = max([point[3] for point in arrival.path])
-
-    # Get discontinuities in the model
-    v_mod = model.s_mod.v_mod  # velocity model
-    discs = v_mod.get_discontinuity_depths()[:-1]
-
-    # Including the bottoming and source depths allows cross indexing with the paths variable when
-    # the start point is not the lowest point on the ray path
-    assess_discs = np.append(discs, (bot_dep, arrival.source_depth, arrival.receiver_depth))
-
-    # Get which discontinuities the phase interacts with, include bottoming depth to allow
-    # cross indexing with the paths variable
-    ids = [
-        (i, point[3], point[2])  # index, depth, distance
-        for i, point in enumerate(arrival_path)
-        if point[3] in assess_discs
-    ]
-
-    ray_param = arrival_path[0][0]
+    # Points at which to evaluate discontinuity coefficients
+    pierce_points = [p[0] for p in paths]
+    pierce_points.append(paths[-1][-1,:]) # the receiver point
+    
     sigmas = []
-    for i, x in enumerate(ids):
-        ind = x[0]
-        depth = x[1]
-        distance = x[2]
+    for i, point in enumerate(pierce_points):
+        ray_param = point[0]
+        distance = point[2]
+        depth = point[3]
         radius = model.radius_of_planet - depth
 
         # Depth and phases pre, source is a special case
-        if ind == 0:
+        if i == 0:
+            # source
             depth_pre = depth
             phase_pre = waves[i]
         else:
-            depth_pre = arrival_path[ind - 1][3]
+            depth_pre = paths[i-1][-2,3]
             phase_pre = waves[i - 1]
 
         # Depth and phases post, receiver is a special case
-        if ind == len(arrival_path) - 1:
+        if i == len(pierce_points) - 1:
+            # receiver
             depth_post = depth
             phase_post = waves[i - 1]
         else:
-            depth_post = arrival_path[ind + 1][3]
+            depth_post = paths[i][1,3]
             phase_post = waves[i]
 
         def f(depth_p, phase_p):
@@ -456,8 +439,9 @@ def discontinuity_coefficients(arrival, model):
             if depth_p == depth:
                 vertical_slowness = 0.0
 
-            # above/below signs, positive if above
+            # above/below sign, positive if above
             sign = np.sign(depth - depth_p)
+            
             return -sign * vertical_slowness
 
         pre = f(depth_pre, phase_pre)
@@ -469,10 +453,10 @@ def discontinuity_coefficients(arrival, model):
         # lambda at this distance
         lamda = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
 
-        # Output coefficients for this discontinuity
+        # coefficients for this discontinuity
         sigmas.append([epsilon * lamda[m] * (pre + post) for m in [0, 1, 2]])
 
-    # Sum the contribution to the coefficients from discontinuities
+    # Sum the coefficients from all discontinuities
     disc_sigma = [np.sum([s[m] for s in sigmas]) for m in [0, 1, 2]]
 
     return disc_sigma
