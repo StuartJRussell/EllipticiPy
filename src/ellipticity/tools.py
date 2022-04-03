@@ -80,13 +80,13 @@ def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
     epsilon = np.insert(epsilon, 0, epsilon[0])  # add a centre of planet value
 
     # Output as model attributes
-    v_mod.epsilon_d = ((a - r) / 1e3)[::-1]  # convert to km
+    v_mod.epsilon_d = ((a - r) / 1e3)[::-1]  # convert to km, reverse order
     v_mod.epsilon = epsilon[::-1]
 
 
 def get_epsilon(model, depth):
     """
-    Gets the value of epsilon for a model at a specified radius
+    Gets the value of epsilon for a model at a specified depth
 
     Inputs:
         model - obspy.taup.tau_model.TauModel object
@@ -103,45 +103,10 @@ def get_epsilon(model, depth):
     # Get the nearest value of epsilon to the given depth
     idx = np.searchsorted(d, depth, side="left")
     if idx > 0 and (
-        idx == len(d)
-        or np.math.fabs(depth - d[idx - 1]) < np.math.fabs(depth - d[idx])
+        idx == len(d) or np.math.fabs(depth - d[idx - 1]) < np.math.fabs(depth - d[idx])
     ):
         return epsilon[idx - 1]
     return epsilon[idx]
-
-
-def get_dvdr_below(model, depth, wave):
-    """
-    Gets the value of dv/dr for a model immediately below a specified radius
-
-    Inputs:
-        model - obspy.taup.tau_model.TauModel object
-        depth - float, depth in km
-        wave - str, wave type: 'p' or 's'
-
-    Output:
-        float, value of dv/dr
-    """
-
-    v_mod = model.s_mod.v_mod
-    return -evaluate_derivative_below(v_mod, depth, wave)[0]
-
-
-def get_dvdr_above(model, depth, wave):
-    """
-    Gets the value of dv/dr for a model immediately above a specified radius
-
-    Inputs:
-        model - obspy.taup.tau_model.TauModel object
-        depth - float, depth in km
-        wave - str, wave type: 'p' or 's'
-
-    Output:
-        float, value of dv/dr
-    """
-
-    v_mod = model.s_mod.v_mod
-    return -evaluate_derivative_above(v_mod, depth, wave)[0]
 
 
 def evaluate_derivative_below(model, depth, prop):
@@ -281,9 +246,9 @@ def split_ray_path(arrival, model):
                 paths[count - 1].append(list(point))
         paths[count].append(list(point))
     paths = [np.array(path) for path in paths]
-    
+
     # Label the paths that are diffracted rays
-    diffracted = [np.all(p[:,3] == p[0,3]) for p in paths]
+    diffracted = [np.all(p[:, 3] == p[0, 3]) for p in paths]
 
     # Get SeismicPhase object
     ph = arrival.phase
@@ -299,8 +264,10 @@ def split_ray_path(arrival, model):
 
     # Wave for each branch in sequence
     # ObsPy doesnt' always assign the correct wave type for the outer core, so enforce P wave
-    wave_type = [wt if ph.branch_seq[i] != oc_branch else True
-        for i, wt in enumerate(ph.wave_type)]
+    wave_type = [
+        wt if ph.branch_seq[i] != oc_branch else True
+        for i, wt in enumerate(ph.wave_type)
+    ]
     wave_type = ["p" if wt else "s" for wt in wave_type]
 
     waves = []
@@ -312,30 +279,27 @@ def split_ray_path(arrival, model):
         else:
             waves.append(wave_type[j])
             j = j + 1
-    
+
     return paths, waves
 
 
 def integral_coefficients(arrival, model):
     """Calculate correction coefficients due to integral along ray path"""
 
-    # Radius of Earth
-    Re = model.radius_of_planet
-
     # Split the ray path
     paths, waves = split_ray_path(arrival, model)
 
     # Loop through path segments
-    seg_ray_sigma = []
+    sigmas = []
     for path, wave in zip(paths, waves):
 
         # Depth in km
         depth = path[:, 3]
 
         # Radius in km
-        radius = Re - depth
+        radius = model.radius_of_planet - depth
 
-        # Velocity in m/s
+        # Velocity in km/s
         v_mod = model.s_mod.v_mod
         v = np.array(
             [
@@ -349,9 +313,9 @@ def integral_coefficients(arrival, model):
         # Gradient of v wrt r in s^-1
         dvdr = np.array(
             [
-                get_dvdr_below(model, d, wave)
+                -evaluate_derivative_below(v_mod, d, wave)[0]
                 if d != max(depth)
-                else get_dvdr_above(model, d, wave)
+                else -evaluate_derivative_above(v_mod, d, wave)[0]
                 for d in depth
             ]
         )
@@ -366,9 +330,9 @@ def integral_coefficients(arrival, model):
         distance = path[:, 2]
 
         # lambda
-        lamda = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
+        lam = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
 
-        # Calculate vertical slowness
+        # vertical slowness
         y = eta**2 - arrival.ray_param**2
         sign = np.sign(y[-1] - y[0])  # figure out if going up or down
         vertical_slowness = np.sqrt(y * (y > 0))  # in s
@@ -376,14 +340,14 @@ def integral_coefficients(arrival, model):
         # Do the integration
         s = v**-1 * dvdr * radius
         integral = [
-            np.trapz((s / (1.0 - s)) * epsilon * sign * lamda[m], x=vertical_slowness)
+            np.trapz((s / (1.0 - s)) * epsilon * sign * lam[m], x=vertical_slowness)
             for m in [0, 1, 2]
         ]
 
-        seg_ray_sigma.append(integral)
+        sigmas.append(integral)
 
     # Sum coefficients for each segment to get total ray path contribution
-    return [np.sum([s[m] for s in seg_ray_sigma]) for m in [0, 1, 2]]
+    return [np.sum([s[m] for s in sigmas]) for m in [0, 1, 2]]
 
 
 def discontinuity_coefficients(arrival, model):
@@ -393,12 +357,12 @@ def discontinuity_coefficients(arrival, model):
     paths, waves = split_ray_path(arrival, model)
 
     # Velocity model
-    v_mod = model.s_mod.v_mod  
+    v_mod = model.s_mod.v_mod
 
     # Points at which to evaluate discontinuity coefficients
     pierce_points = [p[0] for p in paths]
-    pierce_points.append(paths[-1][-1,:]) # the receiver point
-    
+    pierce_points.append(paths[-1][-1, :])  # the receiver point
+
     sigmas = []
     for i, point in enumerate(pierce_points):
         ray_param = point[0]
@@ -412,7 +376,7 @@ def discontinuity_coefficients(arrival, model):
             depth_pre = depth
             phase_pre = waves[i]
         else:
-            depth_pre = paths[i-1][-2,3]
+            depth_pre = paths[i - 1][-2, 3]
             phase_pre = waves[i - 1]
 
         # Depth and phases post, receiver is a special case
@@ -421,7 +385,7 @@ def discontinuity_coefficients(arrival, model):
             depth_post = depth
             phase_post = waves[i - 1]
         else:
-            depth_post = paths[i][1,3]
+            depth_post = paths[i][1, 3]
             phase_post = waves[i]
 
         def f(depth_p, phase_p):
@@ -439,7 +403,7 @@ def discontinuity_coefficients(arrival, model):
 
             # above/below sign, positive if above
             sign = np.sign(depth - depth_p)
-            
+
             return -sign * vertical_slowness
 
         pre = f(depth_pre, phase_pre)
@@ -449,10 +413,10 @@ def discontinuity_coefficients(arrival, model):
         epsilon = get_epsilon(model, depth)
 
         # lambda at this distance
-        lamda = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
+        lam = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
 
         # coefficients for this discontinuity
-        sigmas.append([epsilon * lamda[m] * (pre + post) for m in [0, 1, 2]])
+        sigmas.append([epsilon * lam[m] * (pre + post) for m in [0, 1, 2]])
 
     # Sum the coefficients from all discontinuities
     disc_sigma = [np.sum([s[m] for s in sigmas]) for m in [0, 1, 2]]
