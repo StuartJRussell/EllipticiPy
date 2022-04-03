@@ -26,8 +26,8 @@ def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
         dr - float, step length in m for discretization
 
     Output:
-        Adds arrays of epsilon and radius to the model instance as attributes
-        model.s_mod.v_mod.epsilon and model.s_mod.v_mod.epsilon_r
+        Adds arrays of epsilon and depth to the model instance as attributes
+        model.s_mod.v_mod.epsilon and model.s_mod.v_mod.epsilon_d
     """
 
     # Angular velocity of model
@@ -80,70 +80,68 @@ def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
     epsilon = np.insert(epsilon, 0, epsilon[0])  # add a centre of planet value
 
     # Output as model attributes
-    v_mod.epsilon_r = r / 1e3  # convert to km
-    v_mod.epsilon = epsilon
+    v_mod.epsilon_d = ((a - r) / 1e3)[::-1]  # convert to km
+    v_mod.epsilon = epsilon[::-1]
 
 
-def get_epsilon(model, radius):
+def get_epsilon(model, depth):
     """
     Gets the value of epsilon for a model at a specified radius
 
     Inputs:
         model - obspy.taup.tau_model.TauModel object
-        radius - float, radius in km
+        depth - float, depth in km
 
     Output:
         float, value of epsilon
     """
 
-    # Epsilon and radii arrays
+    # Epsilon and d arrays
     epsilon = model.s_mod.v_mod.epsilon
-    radii = model.s_mod.v_mod.epsilon_r
+    d = model.s_mod.v_mod.epsilon_d
 
-    # Get the nearest value of epsilon to the given radius
-    idx = np.searchsorted(radii, radius, side="left")
+    # Get the nearest value of epsilon to the given depth
+    idx = np.searchsorted(d, depth, side="left")
     if idx > 0 and (
-        idx == len(radii)
-        or np.math.fabs(radius - radii[idx - 1]) < np.math.fabs(radius - radii[idx])
+        idx == len(d)
+        or np.math.fabs(depth - d[idx - 1]) < np.math.fabs(depth - d[idx])
     ):
         return epsilon[idx - 1]
     return epsilon[idx]
 
 
-def get_dvdr_below(model, radius, wave):
+def get_dvdr_below(model, depth, wave):
     """
     Gets the value of dv/dr for a model immediately below a specified radius
 
     Inputs:
         model - obspy.taup.tau_model.TauModel object
-        radius - float, radius in km
+        depth - float, depth in km
         wave - str, wave type: 'p' or 's'
 
     Output:
         float, value of dv/dr
     """
 
-    Re = model.radius_of_planet
     v_mod = model.s_mod.v_mod
-    return -evaluate_derivative_below(v_mod, Re - radius, wave)[0]
+    return -evaluate_derivative_below(v_mod, depth, wave)[0]
 
 
-def get_dvdr_above(model, radius, wave):
+def get_dvdr_above(model, depth, wave):
     """
     Gets the value of dv/dr for a model immediately above a specified radius
 
     Inputs:
         model - obspy.taup.tau_model.TauModel object
-        radius - float, radius in km
+        depth - float, depth in km
         wave - str, wave type: 'p' or 's'
 
     Output:
         float, value of dv/dr
     """
 
-    Re = model.radius_of_planet
     v_mod = model.s_mod.v_mod
-    return -evaluate_derivative_above(v_mod, Re - radius, wave)[0]
+    return -evaluate_derivative_above(v_mod, depth, wave)[0]
 
 
 def evaluate_derivative_below(model, depth, prop):
@@ -351,10 +349,10 @@ def integral_coefficients(arrival, model):
         # Gradient of v wrt r in s^-1
         dvdr = np.array(
             [
-                get_dvdr_below(model, r, wave)
-                if r != min(radius)
-                else get_dvdr_above(model, r, wave)
-                for r in radius
+                get_dvdr_below(model, d, wave)
+                if d != max(depth)
+                else get_dvdr_above(model, d, wave)
+                for d in depth
             ]
         )
 
@@ -362,7 +360,7 @@ def integral_coefficients(arrival, model):
         eta = radius / v
 
         # epsilon
-        epsilon = np.array([get_epsilon(model, r) for r in radius])
+        epsilon = np.array([get_epsilon(model, d) for d in depth])
 
         # Epicentral distance in radians
         distance = path[:, 2]
@@ -448,7 +446,7 @@ def discontinuity_coefficients(arrival, model):
         post = f(depth_post, phase_post)
 
         # epsilon at this depth
-        epsilon = get_epsilon(model, radius)
+        epsilon = get_epsilon(model, depth)
 
         # lambda at this distance
         lamda = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
