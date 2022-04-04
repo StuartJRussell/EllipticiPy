@@ -92,17 +92,22 @@ def get_epsilon(model, depth):
 
     :param model: The tau model object
     :type model: :class:`obspy.taup.tau_model.TauModel`
-    :param depth: depth in km
-    :type depth: float
-    :returns: value of epsilon, ellipticity of figure
-    :rtype: float
+    :param depth: depth(s) in km
+    :type depth: float or :class:`~numpy.ndarray`
+    :returns: values of epsilon, ellipticity of figure
+    :rtype: :class:`~numpy.ndarray`
     """
 
+    if isinstance(depth, float):
+        depth = np.array([depth])
+
     v_mod = model.s_mod.v_mod
-    if depth > 0.0:
-        layer_idx = v_mod.layer_number_above(depth)[0]
-    else:
-        layer_idx = v_mod.layer_number_below(depth)[0]
+
+    top_layer_idx = v_mod.layer_number_below(0.0)[0]
+    layer_idx = top_layer_idx * np.ones(len(depth), dtype=int)
+    cond = depth > 0.0
+    if cond.any():
+        layer_idx[cond] = v_mod.layer_number_above(depth[cond])
 
     layer = v_mod.layers[layer_idx]
     thick = layer["bot_depth"] - layer["top_depth"]
@@ -265,8 +270,15 @@ def split_ray_path(arrival, model):
     # Split up the arrival path into segments based on the branch sequence
     paths = []
     for i, point in enumerate(arrival.path):
-        branch = np.where([branch[0] <= point[3] <= branch[1] for branch in branches])[0]
-        if i == 0 or len(branch) > 1 or point[3] == bot_dep or (point[3] == 0. and i != len(arrival.path) -1):
+        branch = np.where([branch[0] <= point[3] <= branch[1] for branch in branches])[
+            0
+        ]
+        if (
+            i == 0
+            or len(branch) > 1
+            or point[3] == bot_dep
+            or (point[3] == 0.0 and i != len(arrival.path) - 1)
+        ):
             if i != 0:
                 paths[-1].append(list(point))
             paths.append([])
@@ -288,14 +300,13 @@ def split_ray_path(arrival, model):
     # Wave for each branch in sequence
     # ObsPy doesnt' always assign the correct wave type for the outer core, so enforce P wave
     wave_type = [
-        wt if branch_seq[i] != oc_branch else True
-        for i, wt in enumerate(ph.wave_type)
+        wt if branch_seq[i] != oc_branch else True for i, wt in enumerate(ph.wave_type)
     ]
     waves = ["p" if wt else "s" for wt in wave_type]
-    
+
     # The number of path segments and branches in sequence from ObsPy should always be equal
     # If not then something has gone wrong
-    assert(len(paths) == len(branch_seq))
+    assert len(paths) == len(branch_seq)
 
     return paths, waves
 
@@ -314,36 +325,28 @@ def integral_coefficients(arrival, model):
 
         # Depth in km
         depth = path[:, 3]
+        max_depth = np.max(depth)
 
         # Radius in km
         radius = model.radius_of_planet - depth
 
         # Velocity in km/s
         v_mod = model.s_mod.v_mod
-        v = np.array(
-            [
-                v_mod.evaluate_below(d, wave)[0]
-                if d != max(depth)
-                else v_mod.evaluate_above(d, wave)[0]
-                for d in depth
-            ]
-        )
+        cond = depth != max_depth
+        v = np.zeros_like(depth)
+        v[cond] = v_mod.evaluate_below(depth[cond], wave)
+        v[~cond] = v_mod.evaluate_above(max_depth, wave)[0]
 
         # Gradient of v wrt r in s^-1
-        dvdr = np.array(
-            [
-                -evaluate_derivative_below(v_mod, d, wave)[0]
-                if d != max(depth)
-                else -evaluate_derivative_above(v_mod, d, wave)[0]
-                for d in depth
-            ]
-        )
+        dvdr = np.zeros_like(depth)
+        dvdr[cond] = -evaluate_derivative_below(v_mod, depth[cond], wave)
+        dvdr[~cond] = -evaluate_derivative_above(v_mod, max_depth, wave)[0]
 
         # eta in s
         eta = radius / v
 
         # epsilon
-        epsilon = np.array([get_epsilon(model, d) for d in depth])
+        epsilon = get_epsilon(model, depth)
 
         # Epicentral distance in radians
         distance = path[:, 2]
@@ -373,17 +376,17 @@ def discontinuity_contribution(points, phase, model):
     """
     Ellipticity coefficients due to an individual discontinuity.
     """
-    
+
     disc_point = points[0]
     neighbour_point = points[1]
-    
+
     ray_param = disc_point[0]
     distance = disc_point[2]
     depth = disc_point[3]
     radius = model.radius_of_planet - depth
-    
+
     neighbour_depth = neighbour_point[3]
-    
+
     if neighbour_depth >= depth:
         v = model.s_mod.v_mod.evaluate_below(depth, phase)[0]
     else:
@@ -398,16 +401,16 @@ def discontinuity_contribution(points, phase, model):
 
     # above/below sign, positive if above
     sign = np.sign(depth - neighbour_depth)
-    
+
     # epsilon at this depth
     epsilon = get_epsilon(model, depth)
 
     # lambda at this distance
     lam = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
-    
+
     # coefficients for this discontinuity
     sigma = np.array([-sign * vertical_slowness * epsilon * lam[m] for m in [0, 1, 2]])
-    
+
     return sigma
 
 
@@ -424,7 +427,7 @@ def discontinuity_coefficients(arrival, model):
     for path, wave in zip(paths, waves):
         start_points = (path[0], path[1])
         end_points = (path[-1], path[-2])
-        
+
         start = discontinuity_contribution(start_points, wave, model)
         end = discontinuity_contribution(end_points, wave, model)
 
