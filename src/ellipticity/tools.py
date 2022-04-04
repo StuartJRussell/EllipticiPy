@@ -374,75 +374,66 @@ def integral_coefficients(arrival, model):
     return [np.sum([s[m] for s in sigmas]) for m in [0, 1, 2]]
 
 
+def discontinuity_contribution(points, phase, model):
+    """
+    Ellipticity coefficients due to an individual discontinuity.
+    """
+    
+    disc_point = points[0]
+    neighbour_point = points[1]
+    
+    ray_param = disc_point[0]
+    distance = disc_point[2]
+    depth = disc_point[3]
+    radius = model.radius_of_planet - depth
+    
+    neighbour_depth = neighbour_point[3]
+    
+    if neighbour_depth >= depth:
+        v = model.s_mod.v_mod.evaluate_below(depth, phase)[0]
+    else:
+        v = model.s_mod.v_mod.evaluate_above(depth, phase)[0]
+
+    eta = radius / v
+    y = eta**2 - ray_param**2
+    vertical_slowness = np.sqrt(y * (y > 0))
+
+    if neighbour_depth == depth:
+        vertical_slowness = 0.0
+
+    # above/below sign, positive if above
+    sign = np.sign(depth - neighbour_depth)
+    
+    # epsilon at this depth
+    epsilon = get_epsilon(model, depth)
+
+    # lambda at this distance
+    lam = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
+    
+    # coefficients for this discontinuity
+    sigma = np.array([-sign * vertical_slowness * epsilon * lam[m] for m in [0, 1, 2]])
+    
+    return sigma
+
+
 def discontinuity_coefficients(arrival, model):
     """
-    Ellipticity coefficients due to discontinuities.
+    Ellipticity coefficients due to all discontinuities.
     """
 
     # Split the ray path
     paths, waves = split_ray_path(arrival, model)
 
-    # Velocity model
-    v_mod = model.s_mod.v_mod
-
-    # Points at which to evaluate discontinuity coefficients
-    pierce_points = [p[0] for p in paths]
-    pierce_points.append(paths[-1][-1, :])  # the receiver point
-
+    # Loop through path segments
     sigmas = []
-    for i, point in enumerate(pierce_points):
-        ray_param = point[0]
-        distance = point[2]
-        depth = point[3]
-        radius = model.radius_of_planet - depth
+    for path, wave in zip(paths, waves):
+        start_points = (path[0], path[1])
+        end_points = (path[-1], path[-2])
+        
+        start = discontinuity_contribution(start_points, wave, model)
+        end = discontinuity_contribution(end_points, wave, model)
 
-        # Depth and phases pre, source is a special case
-        if i == 0:
-            # source
-            depth_pre = depth
-            phase_pre = waves[i]
-        else:
-            depth_pre = paths[i - 1][-2, 3]
-            phase_pre = waves[i - 1]
-
-        # Depth and phases post, receiver is a special case
-        if i == len(pierce_points) - 1:
-            # receiver
-            depth_post = depth
-            phase_post = waves[i - 1]
-        else:
-            depth_post = paths[i][1, 3]
-            phase_post = waves[i]
-
-        def f(depth_p, phase_p):
-            if depth_p >= depth:
-                v = v_mod.evaluate_below(depth, phase_p)[0]
-            else:
-                v = v_mod.evaluate_above(depth, phase_p)[0]
-
-            eta = radius / v
-            y = eta**2 - ray_param**2
-            vertical_slowness = np.sqrt(y * (y > 0))
-
-            if depth_p == depth:
-                vertical_slowness = 0.0
-
-            # above/below sign, positive if above
-            sign = np.sign(depth - depth_p)
-
-            return -sign * vertical_slowness
-
-        pre = f(depth_pre, phase_pre)
-        post = f(depth_post, phase_post)
-
-        # epsilon at this depth
-        epsilon = get_epsilon(model, depth)
-
-        # lambda at this distance
-        lam = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
-
-        # coefficients for this discontinuity
-        sigmas.append([epsilon * lam[m] * (pre + post) for m in [0, 1, 2]])
+        sigmas.append(start + end)
 
     # Sum the coefficients from all discontinuities
     disc_sigma = [np.sum([s[m] for s in sigmas]) for m in [0, 1, 2]]
