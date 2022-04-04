@@ -40,7 +40,6 @@ def model_epsilon(model, lod=EARTH_LOD):
     top_density = v_mod.layers["top_density"][::-1] * 1e3  # in kg m^-3
     bot_density = v_mod.layers["bot_density"][::-1] * 1e3  # in kg m^-3
     top_radius = a - top_depth
-    bot_radius = a - bot_depth
 
     # Mass within each spherical shell by trapezoidal rule
     top_volume = (4.0 / 3.0) * np.pi * top_radius**3
@@ -335,12 +334,12 @@ def integral_coefficients(arrival, model):
         cond = depth != max_depth
         v = np.zeros_like(depth)
         v[cond] = v_mod.evaluate_below(depth[cond], wave)
-        v[~cond] = v_mod.evaluate_above(max_depth, wave)[0]
+        v[~cond] = v_mod.evaluate_above(max_depth, wave)
 
         # Gradient of v wrt r in s^-1
         dvdr = np.zeros_like(depth)
         dvdr[cond] = -evaluate_derivative_below(v_mod, depth[cond], wave)
-        dvdr[~cond] = -evaluate_derivative_above(v_mod, max_depth, wave)[0]
+        dvdr[~cond] = -evaluate_derivative_above(v_mod, max_depth, wave)
 
         # eta in s
         eta = radius / v
