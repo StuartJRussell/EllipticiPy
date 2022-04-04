@@ -15,7 +15,7 @@ EARTH_LOD = 86164.0905  # s, length of day
 G = 6.67408e-11  # m^3 kg^-1 s^-2, universal gravitational constant
 
 
-def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
+def model_epsilon(model, lod=EARTH_LOD):
     """
     Calculates a profile of ellipticity of figure (epsilon) through a planetary model.
 
@@ -23,67 +23,67 @@ def model_epsilon(model, lod=EARTH_LOD, taper=True, dr=100):
     :type model: :class:`obspy.taup.tau_model.TauModel`
     :param lod: length of day in seconds. Defaults to Earth value
     :type lod: float
-    :param taper: whether to taper below ICB or not. Causes problems if False
-        (and True is consistent with previous works, e.g. Bullen & Haddon (1973))
-    :type taper: false
-    :param dr: step length in m for discretization
-    :type dr: float
-    :returns: Adds arrays of epsilon and depth to the model instance as attributes
-        model.s_mod.v_mod.epsilon and model.s_mod.v_mod.epsilon_d
+    :returns: Adds arrays of epsilon at top and bottom of each velocity layer as
+        attributes model.s_mod.v_mod.top_epsilon and model.s_mod.v_mod.bot_epsilon
     """
 
     # Angular velocity of model
-    Omega = 2 * np.pi / lod  # s^-1
+    omega = 2 * np.pi / lod  # s^-1
 
     # Radius of planet in m
     a = model.radius_of_planet * 1e3
 
-    # Radii in m to evaluate integrals
-    r = np.linspace(0, a, 1 + int(a / dr))
+    # Depth and density information of velocity layers
+    v_mod = model.s_mod.v_mod  # velocity_model
+    top_depth = v_mod.layers["top_depth"][::-1] * 1e3  # in m
+    bot_depth = v_mod.layers["bot_depth"][::-1] * 1e3  # in m
+    top_density = v_mod.layers["top_density"][::-1] * 1e3  # in kg m^-3
+    bot_density = v_mod.layers["bot_density"][::-1] * 1e3  # in kg m^-3
+    top_radius = a - top_depth
+    bot_radius = a - bot_depth
 
-    # Get the density (in kg m^-3) at these radii
-    v_mod = model.s_mod.v_mod
-    rho = np.append(
-        v_mod.evaluate_above((a - r[:-1]) / 1e3, "d") * 1e3,
-        v_mod.evaluate_below(0.0, "d")[0] * 1e3,
-    )
+    # Mass within each spherical shell by trapezoidal rule
+    top_volume = (4.0 / 3.0) * np.pi * top_radius**3
+    volume = np.zeros(len(top_depth) + 1)
+    volume[1:] = top_volume
+    d_volume = volume[1:] - volume[:-1]
+    d_mass = 0.5 * (bot_density + top_density) * d_volume
+    mass = np.cumsum(d_mass)
 
-    # Mass within each spherical shell
-    Mr = 4 * np.pi * cumtrapz(rho * (r**2) * dr)
+    total_mass = mass[-1]
 
-    # Total mass of body
-    M = Mr[-1]
+    # Moment of inertia of each spherical shell by trapezoidal rule
+    j_top = (8.0 / 15.0) * np.pi * top_radius**5
+    j = np.zeros(len(top_depth) + 1)
+    j[1:] = j_top
+    d_j = j[1:] - j[:-1]
+    d_inertia = 0.5 * (bot_density + top_density) * d_j
 
-    # Moment of inertia of each spherical shell
-    Ir = (8.0 / 3.0) * np.pi * cumtrapz(rho * (r**4) * dr)
+    moment_of_inertia = np.cumsum(d_inertia)
 
     # Calculate y (moment of inertia factor) for surfaces within the body
-    y = Ir / (Mr * r[1:] ** 2)
-
-    # Taper if required
-    # Have maximum y of 0.4, this is where eta is 0
-    # Otherwise epsilon tends to infinity at the centre of the planet
-    if taper:
-        y[y > 0.4] = 0.4
+    y = moment_of_inertia / (mass * top_radius**2)
 
     # Calculate Radau's parameter
-    eta = 6.25 * (1 - 3 * y / 2) ** 2 - 1
+    radau = 6.25 * (1 - 3 * y / 2) ** 2 - 1
 
     # Calculate h
     # Ratio of centrifugal force and gravity for a particle on the equator at the surface
-    ha = (a**3 * Omega**2) / (G * M)
+    ha = (a**3 * omega**2) / (G * total_mass)
 
     # epsilon at surface
-    epsilona = (5 * ha) / (2 * eta[-1] + 4)
+    epsilona = (5 * ha) / (2 * radau[-1] + 4)
 
     # Solve the differential equation
-    epsilon = np.exp(cumtrapz(dr * eta / r[1:], initial=0.0))
+    epsilon = np.exp(cumtrapz(radau / top_radius, x=top_radius, initial=0.0))
     epsilon = epsilona * epsilon / epsilon[-1]
-    epsilon = np.insert(epsilon, 0, epsilon[0])  # add a centre of planet value
 
     # Output as model attributes
-    v_mod.epsilon_d = ((a - r) / 1e3)[::-1]  # convert to km, reverse order
-    v_mod.epsilon = epsilon[::-1]
+    r = np.zeros(len(top_radius) + 1)
+    r[1:] = top_radius
+    epsilon = np.insert(epsilon, 0, epsilon[0])  # add a centre of planet value
+    v_mod.top_epsilon = epsilon[::-1][:-1]
+    v_mod.bot_epsilon = epsilon[::-1][1:]
 
 
 def get_epsilon(model, depth):
@@ -98,17 +98,18 @@ def get_epsilon(model, depth):
     :rtype: float
     """
 
-    # Epsilon and d arrays
-    epsilon = model.s_mod.v_mod.epsilon
-    d = model.s_mod.v_mod.epsilon_d
+    v_mod = model.s_mod.v_mod
+    if depth > 0.0:
+        layer_idx = v_mod.layer_number_above(depth)[0]
+    else:
+        layer_idx = v_mod.layer_number_below(depth)[0]
 
-    # Get the nearest value of epsilon to the given depth
-    idx = np.searchsorted(d, depth, side="left")
-    if idx > 0 and (
-        idx == len(d) or np.math.fabs(depth - d[idx - 1]) < np.math.fabs(depth - d[idx])
-    ):
-        return epsilon[idx - 1]
-    return epsilon[idx]
+    layer = v_mod.layers[layer_idx]
+    thick = layer["bot_depth"] - layer["top_depth"]
+    bot_eps = v_mod.bot_epsilon[layer_idx]
+    top_eps = v_mod.top_epsilon[layer_idx]
+    slope = (bot_eps - top_eps) / thick
+    return slope * (depth - layer["top_depth"]) + top_eps
 
 
 def evaluate_derivative_below(model, depth, prop):

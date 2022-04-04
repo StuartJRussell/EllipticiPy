@@ -16,4 +16,4 @@ def test_epsilon():
 
     print("epsilon_CMB", expected_epsilon, calculated_epsilon)
 
-    assert abs(calculated_epsilon - expected_epsilon) < 1e-6
+    assert abs(calculated_epsilon - expected_epsilon) < 2e-6
