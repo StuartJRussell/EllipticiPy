@@ -231,7 +231,7 @@ def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
         raise TypeError("Velocity model not correct type")
 
     # Calculate epsilon values if they don't already exist
-    if not hasattr(model.s_mod.v_mod, "epsilon"):
+    if not hasattr(model.s_mod.v_mod, "top_epsilon"):
         model_epsilon(model, lod)
 
     ray_sigma = integral_coefficients(arrival, model)
