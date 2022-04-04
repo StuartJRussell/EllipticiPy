@@ -250,28 +250,6 @@ def split_ray_path(arrival, model):
     # Get discontinuity depths in the model in km
     discs = model.s_mod.v_mod.get_discontinuity_depths()[:-1]
 
-    # Split the path at discontinuities, bottoming depth and source depth
-    paths = []
-    count = -1
-    for i, point in enumerate(arrival.path):
-        depth = point[3]
-        if (
-            depth in discs  # Is at a discontinuity
-            or depth == bot_dep  # or at the bottoming depth
-            or depth == arrival.source_depth  # or the source depth (beginning)
-        ) and i != len(
-            arrival.path
-        ) - 1:  # not at the end
-            count = count + 1
-            paths.append([])
-            if count != 0:
-                paths[count - 1].append(list(point))
-        paths[count].append(list(point))
-    paths = [np.array(path) for path in paths]
-
-    # Label the paths that are diffracted rays
-    diffracted = [np.all(p[:, 3] == p[0, 3]) for p in paths]
-
     # Get SeismicPhase object
     ph = arrival.phase
 
@@ -281,26 +259,43 @@ def split_ray_path(arrival, model):
         for x in model.depth_correct(arrival.source_depth).tau_branches[0]
     ]
 
+    # Get the branch sequence
+    branch_seq = ph.branch_seq
+
+    # Split up the arrival path into segments based on the branch sequence
+    paths = []
+    for i, point in enumerate(arrival.path):
+        branch = np.where([branch[0] <= point[3] <= branch[1] for branch in branches])[0]
+        if i == 0 or len(branch) > 1 or point[3] == bot_dep or (point[3] == 0. and i != len(arrival.path) -1):
+            if i != 0:
+                paths[-1].append(list(point))
+            paths.append([])
+        paths[-1].append(list(point))
+    paths = [np.array(path) for path in paths]
+
+    # Label the paths that are diffracted rays, these have no change in depth but do have a change in distance
+    diffracted = [np.all(p[:, 3] == p[0, 3]) and p[0][2] != p[-1][2] for p in paths]
+
+    # Remove diffracted segments
+    paths = [p for i, p in enumerate(paths) if not diffracted[i]]
+
+    # Remove segments with repeated bottoming depth that aren't a discontinuity
+    paths = [p for p in paths if bot_dep in discs or not np.all(p[:, 3] == bot_dep)]
+
     # Get which branch is the the outer core branch
     oc_branch = branches.index((model.cmb_depth, model.iocb_depth))
 
     # Wave for each branch in sequence
     # ObsPy doesnt' always assign the correct wave type for the outer core, so enforce P wave
     wave_type = [
-        wt if ph.branch_seq[i] != oc_branch else True
+        wt if branch_seq[i] != oc_branch else True
         for i, wt in enumerate(ph.wave_type)
     ]
-    wave_type = ["p" if wt else "s" for wt in wave_type]
-
-    waves = []
-    j = 0
-    for i, path in enumerate(paths):
-        if diffracted[i]:
-            # Set diffracted segments to p, but they won't make a contribution.
-            waves.append("p")
-        else:
-            waves.append(wave_type[j])
-            j = j + 1
+    waves = ["p" if wt else "s" for wt in wave_type]
+    
+    # The number of path segments and branches in sequence from ObsPy should always be equal
+    # If not then something has gone wrong
+    assert(len(paths) == len(branch_seq))
 
     return paths, waves
 
