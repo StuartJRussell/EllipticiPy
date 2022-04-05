@@ -5,10 +5,9 @@ corrections. All functions in this file are called by the main functions
 in the main file.
 """
 
+import obspy
 import numpy as np
 from scipy.integrate import cumtrapz
-
-import obspy
 
 # Constants
 EARTH_LOD = 86164.0905  # s, length of day
@@ -27,7 +26,7 @@ def model_epsilon(model, lod=EARTH_LOD):
         attributes model.s_mod.v_mod.top_epsilon and model.s_mod.v_mod.bot_epsilon
     """
 
-    # Angular velocity of model
+    # Angular velocity of planet
     omega = 2 * np.pi / lod  # s^-1
 
     # Radius of planet in m
@@ -125,6 +124,8 @@ def evaluate_derivative_below(model, depth, prop):
     Evaluate depth derivative of material property at bottom of a velocity layer.
     """
 
+    # Get the appropriate slowness layer
+    # Velocity gradient is constant in any slowness layer
     layer = model.layers[model.layer_number_below(depth)]
     return evaluate_derivative_at(layer, prop)
 
@@ -134,6 +135,8 @@ def evaluate_derivative_above(model, depth, prop):
     Evaluate depth derivative of material property at top of a velocity layer.
     """
 
+    # Get the appropriate slowness layer
+    # Velocity gradient is constant in any slowness layer
     layer = model.layers[model.layer_number_above(depth)]
     return evaluate_derivative_at(layer, prop)
 
@@ -143,6 +146,8 @@ def evaluate_derivative_at(layer, prop):
     Evaluate depth derivative of material property in a velocity layer.
     """
 
+    # Get the velocity gradient from the slowness layer
+    # Velocity gradient is constant in any slowness layer
     thick = layer["bot_depth"] - layer["top_depth"]
     prop = prop.lower()
     if prop == "p":
@@ -328,7 +333,7 @@ def expected_travel_time(ray_param, depth0, depth1, wave, model):
         v1 = v_mod.evaluate_below(depth1, wave)[0]
         dvdr = -evaluate_derivative_below(v_mod, depth1, wave)[0]
 
-    # Calculate time if velocity non-zero - if zero then return zero time
+    # Calculate time for segment if velocity non-zero - if zero then return zero time
     if v0 > 0.0:
         
         eta0 = radius0 / v0
@@ -386,7 +391,8 @@ def classify_path(path, model):
     error_p = (t_p / travel_time) - 1.0
     error_s = (t_s / travel_time) - 1.0
     
-    # Check which wave type matches the given time
+    # Check which wave type matches the given time within tolerance
+    # If no wave type matches within tolerance then something is wrong
     tol = 1e-2
     if abs(error_p) < tol:
         return "p"
@@ -438,7 +444,7 @@ def integral_coefficients(arrival, model):
         # lambda
         lam = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
 
-        # vertical slowness
+        # Vertical slowness
         y = eta**2 - arrival.ray_param**2
         sign = np.sign(y[-1] - y[0])  # figure out if going up or down
         vertical_slowness = np.sqrt(y * (y > 0))  # in s
@@ -460,30 +466,38 @@ def discontinuity_contribution(points, phase, model):
     """
     Ellipticity coefficients due to an individual discontinuity.
     """
-
+    
+    # Use closest points to the boundary
     disc_point = points[0]
     neighbour_point = points[1]
-
+    
+    # Ray parameter
     ray_param = disc_point["p"]
+    
+    # Distance in radians
     distance = disc_point["dist"]
+    
+    # Radius in km
     depth = disc_point["depth"]
     radius = model.radius_of_planet - depth
-
     neighbour_depth = neighbour_point["depth"]
 
+    # Get velocity on appropriate side of the boundary
     if neighbour_depth >= depth:
         v = model.s_mod.v_mod.evaluate_below(depth, phase)[0]
     else:
         v = model.s_mod.v_mod.evaluate_above(depth, phase)[0]
 
+    # Vertical slowness
     eta = radius / v
     y = eta**2 - ray_param**2
     vertical_slowness = np.sqrt(y * (y > 0))
-
+    
+    # If ray does not change depth then this should have no contribution
     if neighbour_depth == depth:
         vertical_slowness = 0.0
 
-    # above/below sign, positive if above
+    # Above/below sign, positive if above
     sign = np.sign(depth - neighbour_depth)
 
     # epsilon at this depth
@@ -492,7 +506,7 @@ def discontinuity_contribution(points, phase, model):
     # lambda at this distance
     lam = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
 
-    # coefficients for this discontinuity
+    # Coefficients for this discontinuity
     sigma = np.array([-sign * vertical_slowness * epsilon * lam[m] for m in [0, 1, 2]])
 
     return sigma
