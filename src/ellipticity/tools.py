@@ -270,26 +270,22 @@ def split_ray_path(arrival, model):
     paths = []
     waves = []
     for path, wave in zip(dpaths, dwaves):
-        bot_dep = np.max(path["depth"])
-        if bot_dep not in (path["depth"][0], path["depth"][-1]):
-            # We have a ray which bottoms in the interval. Split.
-            cond = path["depth"] == bot_dep
-            idx = np.where(cond)[0][0]
-            path0 = path[0 : idx + 1]
-            path1 = path[idx:]
-            paths.append(path0)
-            paths.append(path1)
-            waves.append(wave)
-            waves.append(wave)
-        else:
-            paths.append(path)
-            waves.append(wave)
-    paths = np.array(paths, dtype=object)
-    waves = np.array(waves, dtype=object)
-
-    diffracted = waves == "diff"
-    paths = paths[~diffracted]
-    waves = waves[~diffracted]
+        if wave != "diff":
+            bot_dep = np.max(path["depth"])
+            if bot_dep not in (path["depth"][0], path["depth"][-1]):
+                # We have a ray which bottoms in the interval. Split.
+                cond = path["depth"] == bot_dep
+                idx = np.where(cond)[0][0]
+                path0 = path[0 : idx + 1]
+                path1 = path[idx:]
+                paths.append(path0)
+                paths.append(path1)
+                waves.append(wave)
+                waves.append(wave)
+            else:
+                paths.append(path)
+                waves.append(wave)
+    assert(len(paths) == len(waves))
 
     return paths, waves
 
