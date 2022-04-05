@@ -5,12 +5,13 @@ corrections. All functions in this file are called by the main functions
 in the main file.
 """
 
+#Import modules
 import obspy
 import numpy as np
 from scipy.integrate import cumtrapz
 
 # Constants
-EARTH_LOD = 86164.0905  # s, length of day
+EARTH_LOD = 86164.0905  # s, length of day of Earth
 G = 6.67408e-11  # m^3 kg^-1 s^-2, universal gravitational constant
 
 
@@ -183,7 +184,7 @@ def weighted_alp2(m, theta):
         (2 - kronecker_0m) * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
     )
     
-    #Return polynomial of degree 2 and order m
+    # Return polynomial of degree 2 and order m
     if m == 0:
         return norm * 0.5 * (3.0 * np.cos(theta) ** 2 - 1.0)
     if m == 1:
@@ -240,7 +241,7 @@ def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     :rtype: list
     """
 
-    #Ensure that model is TauModel
+    # Ensure that model is TauModel
     if isinstance(model, obspy.taup.tau.TauPyModel):
         model = model.model
     if not isinstance(model, obspy.taup.tau_model.TauModel):
@@ -380,10 +381,10 @@ def classify_path(path, model):
     if depth0 == depth1:
         return "diff"
 
-    #Time for this segement from ObsPy ray path
+    # Time for this segement from ObsPy ray path
     travel_time = point1["time"] - point0["time"]
 
-    #Get the expcected travel time for each wave type
+    # Get the expcected travel time for each wave type
     t_p = expected_travel_time(ray_param, depth0, depth1, "p", model)
     t_s = expected_travel_time(ray_param, depth0, depth1, "s", model)
 
@@ -391,14 +392,11 @@ def classify_path(path, model):
     error_p = (t_p / travel_time) - 1.0
     error_s = (t_s / travel_time) - 1.0
     
-    # Check which wave type matches the given time within tolerance
-    # If no wave type matches within tolerance then something is wrong
-    tol = 1e-2
-    if abs(error_p) < tol:
+    # Check which wave type matches the given time the best
+    if abs(error_p) < abs(error_s):
         return "p"
-    if abs(error_s) < tol:
+    else:
         return "s"
-    raise ValueError("Difficulty with determining ray type.")
 
 
 def integral_coefficients(arrival, model):
