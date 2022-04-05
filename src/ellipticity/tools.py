@@ -99,20 +99,24 @@ def get_epsilon(model, depth):
 
     if isinstance(depth, float):
         depth = np.array([depth])
-
+    
+    # Velocity model from TauModel
     v_mod = model.s_mod.v_mod
 
+    # Closest index to depth
     top_layer_idx = v_mod.layer_number_below(0.0)[0]
     layer_idx = top_layer_idx * np.ones(len(depth), dtype=int)
     cond = depth > 0.0
     if cond.any():
         layer_idx[cond] = v_mod.layer_number_above(depth[cond])
 
+    # Interpolate to get epsilon value
     layer = v_mod.layers[layer_idx]
     thick = layer["bot_depth"] - layer["top_depth"]
     bot_eps = v_mod.bot_epsilon[layer_idx]
     top_eps = v_mod.top_epsilon[layer_idx]
     slope = (bot_eps - top_eps) / thick
+    
     return slope * (depth - layer["top_depth"]) + top_eps
 
 
@@ -166,11 +170,15 @@ def weighted_alp2(m, theta):
     :rtype: float
     """
 
+    # Kronecker delta
     kronecker_0m = 1 if m == 0 else 0
+    
+    # Pre-factor for polynomial - Schmidt semi-normalisation
     norm = np.sqrt(
         (2 - kronecker_0m) * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
     )
-
+    
+    #Return polynomial of degree 2 and order m
     if m == 0:
         return norm * 0.5 * (3.0 * np.cos(theta) ** 2 - 1.0)
     if m == 1:
@@ -205,9 +213,11 @@ def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
     [[-0.9323682254592675, -0.6888598392172868, -0.8824096866702915]]
     """
 
+    # If model not specified then obtain via Arrivals
     if model is None:
         model = arrivals.model
 
+    # Get coefficients for each arrival individually
     return [individual_ellipticity_coefficients(arr, model, lod) for arr in arrivals]
 
 
@@ -225,6 +235,7 @@ def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     :rtype: list
     """
 
+    #Ensure that model is TauModel
     if isinstance(model, obspy.taup.tau.TauPyModel):
         model = model.model
     if not isinstance(model, obspy.taup.tau_model.TauModel):
@@ -233,8 +244,11 @@ def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     # Calculate epsilon values if they don't already exist
     if not hasattr(model.s_mod.v_mod, "top_epsilon"):
         model_epsilon(model, lod)
-
+    
+    # Coefficients from continuous ray path
     ray_sigma = integral_coefficients(arrival, model)
+    
+    # Coefficients from discontinuities
     disc_sigma = discontinuity_coefficients(arrival, model)
 
     # Sum the contribution from the ray path and the discontinuities to get final coefficients
@@ -254,17 +268,18 @@ def split_ray_path(arrival, model):
     # Split path at discontinuity depths
     full_path = arrival.path
     depths = full_path["depth"]
-    cond = np.isin(depths, discs)
-    cond[0] = False  # Don't split on first point
-    idx = np.where(cond)[0]
-
+    is_disc = np.isin(depths, discs)
+    is_disc[0] = False  # Don't split on first point
+    idx = np.where(is_disc)[0]
+    
+    # Split ray paths, including start and end points
     splitted = np.split(full_path, idx)
     dpaths = [np.append(s, splitted[i + 1][0]) for i, s in enumerate(splitted[:-1])]
 
-    # Classify the waves
+    # Classify the waves - P or S
     dwaves = [classify_path(path, model) for path in dpaths]
 
-    # Construct final path list by splitting on bottoming depths and removing diffracted
+    # Construct final path list by splitting on bottoming depths and removing diffracted segments
     paths = []
     waves = []
     for path, wave in zip(dpaths, dwaves):
@@ -272,8 +287,8 @@ def split_ray_path(arrival, model):
             bot_dep = np.max(path["depth"])
             if bot_dep not in (path["depth"][0], path["depth"][-1]):
                 # We have a ray which bottoms in the interval. Split.
-                cond = path["depth"] == bot_dep
-                idx = np.where(cond)[0][0]
+                is_bottom = path["depth"] == bot_dep
+                idx = np.where()[0][0]
                 path0 = path[0 : idx + 1]
                 path1 = path[idx:]
                 paths.append(path0)
@@ -283,7 +298,9 @@ def split_ray_path(arrival, model):
             else:
                 paths.append(path)
                 waves.append(wave)
-
+    
+    # Enforce that paths and waves are the same length
+    # Something has gone wrong if not
     assert len(paths) == len(waves)
 
     return paths, waves
@@ -294,11 +311,14 @@ def expected_travel_time(ray_param, depth0, depth1, wave, model):
     Expected travel time between two depths for a given wave type (p or s).
     """
 
+    # Convert depths to radii
     radius0 = model.radius_of_planet - depth0
     radius1 = model.radius_of_planet - depth1
 
+    # Velocity model from TauModel
     v_mod = model.s_mod.v_mod
 
+    # Get velocities and dv/dr
     if depth1 >= depth0:
         v0 = v_mod.evaluate_below(depth0, wave)[0]
         v1 = v_mod.evaluate_above(depth1, wave)[0]
@@ -308,14 +328,16 @@ def expected_travel_time(ray_param, depth0, depth1, wave, model):
         v1 = v_mod.evaluate_below(depth1, wave)[0]
         dvdr = -evaluate_derivative_below(v_mod, depth1, wave)[0]
 
+    # Calculate time if velocity non-zero - if zero then return zero time
     if v0 > 0.0:
+        
         eta0 = radius0 / v0
         eta1 = radius1 / v1
-
+        
         def vertical_slowness(eta, p):
             y = eta**2 - p**2
             return np.sqrt(y * (y > 0))  # in s
-
+            
         n0 = vertical_slowness(eta0, ray_param)
         n1 = vertical_slowness(eta1, ray_param)
 
@@ -333,6 +355,7 @@ def classify_path(path, model):
     """
     Determine whether we have a p-wave or an s-wave path by comparing travel times.
     """
+    
     # Examine just the first two points near the shallowest part of the path
     if path[0]["depth"] < path[-1]["depth"]:
         point0 = path[0]
@@ -340,24 +363,30 @@ def classify_path(path, model):
     else:
         point0 = path[-2]
         point1 = path[-1]
-
+    
+    # Ray parameter
     ray_param = point0["p"]
 
+    # Depths
     depth0 = point0["depth"]
     depth1 = point1["depth"]
 
+    # If no change in depth then this is a diffracted/head wave segment
     if depth0 == depth1:
-        # if not changing depth then it is a diffracted/head wave segment
         return "diff"
 
+    #Time for this segement from ObsPy ray path
     travel_time = point1["time"] - point0["time"]
 
+    #Get the expcected travel time for each wave type
     t_p = expected_travel_time(ray_param, depth0, depth1, "p", model)
     t_s = expected_travel_time(ray_param, depth0, depth1, "s", model)
 
+    # Difference between predictions and given travel times
     error_p = (t_p / travel_time) - 1.0
     error_s = (t_s / travel_time) - 1.0
-
+    
+    # Check which wave type matches the given time
     tol = 1e-2
     if abs(error_p) < tol:
         return "p"
@@ -482,10 +511,12 @@ def discontinuity_coefficients(arrival, model):
     for path, wave in zip(paths, waves):
         start_points = (path[0], path[1])
         end_points = (path[-1], path[-2])
-
+        
+        # Contributions from each end of the ray path segment
         start = discontinuity_contribution(start_points, wave, model)
         end = discontinuity_contribution(end_points, wave, model)
-
+        
+        # Overall contribution
         sigmas.append(start + end)
 
     # Sum the coefficients from all discontinuities
