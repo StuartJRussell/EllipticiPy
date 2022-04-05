@@ -333,9 +333,13 @@ def classify_path(path, model):
     """
     Determine whether we have a p-wave or an s-wave path by comparing travel times.
     """
-    # Examine just the first two points on the path
-    point0 = path[0]
-    point1 = path[1]
+    # Examine just the first two points near the shallowest part of the path
+    if path[0]["depth"] < path[-1]["depth"]:
+        point0 = path[0]
+        point1 = path[1]
+    else:
+        point0 = path[-2]
+        point1 = path[-1]
 
     ray_param = point0["p"]
 
@@ -354,7 +358,7 @@ def classify_path(path, model):
     error_p = (t_p / travel_time) - 1.0
     error_s = (t_s / travel_time) - 1.0
 
-    tol = 1e-4
+    tol = 1e-2
     if abs(error_p) < tol:
         return "p"
     if abs(error_s) < tol:
