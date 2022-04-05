@@ -288,7 +288,7 @@ def split_ray_path(arrival, model):
             if bot_dep not in (path["depth"][0], path["depth"][-1]):
                 # We have a ray which bottoms in the interval. Split.
                 is_bottom = path["depth"] == bot_dep
-                idx = np.where()[0][0]
+                idx = np.where(is_bottom)[0][0]
                 path0 = path[0 : idx + 1]
                 path1 = path[idx:]
                 paths.append(path0)
