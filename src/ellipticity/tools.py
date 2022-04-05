@@ -248,66 +248,123 @@ def split_ray_path(arrival, model):
     Split and label ray path according to type of wave.
     """
 
-    # Bottoming depth of ray
-    bot_dep = max([x[3] for x in arrival.path])
-
     # Get discontinuity depths in the model in km
     discs = model.s_mod.v_mod.get_discontinuity_depths()[:-1]
 
-    # Get SeismicPhase object
-    ph = arrival.phase
+    # Split path at discontinuity depths
+    full_path = arrival.path
+    depths = full_path["depth"]
+    cond = [d in discs for d in depths]
+    cond[0] = False  # Don't split on first point
+    idx = np.where(cond)[0]
 
-    # Get the branches of the TauModel
-    branches = [
-        (x.top_depth, x.bot_depth)
-        for x in model.depth_correct(arrival.source_depth).tau_branches[0]
-    ]
+    splitted = np.split(full_path, idx)
+    dpaths = [np.append(s, splitted[i + 1][0]) for i, s in enumerate(splitted[:-1])]
 
-    # Get the branch sequence
-    branch_seq = ph.branch_seq
+    # Classify the waves
+    dwaves = [classify_path(path, model) for path in dpaths]
 
-    # Split up the arrival path into segments based on the branch sequence
+    # Make a further split on the bottoming depths
+    bot_dep = np.max(depths)
+
     paths = []
-    for i, point in enumerate(arrival.path):
-        branch = np.where([branch[0] <= point[3] <= branch[1] for branch in branches])[
-            0
-        ]
-        if (
-            i == 0
-            or len(branch) > 1
-            or point[3] == bot_dep
-            or (point[3] == 0.0 and i != len(arrival.path) - 1)
-        ):
-            if i != 0:
-                paths[-1].append(list(point))
-            paths.append([])
-        paths[-1].append(list(point))
-    paths = [np.array(path) for path in paths]
+    waves = []
+    for path, wave in zip(dpaths, dwaves):
+        bot_dep = np.max(path["depth"])
+        if bot_dep not in (path["depth"][0], path["depth"][-1]):
+            # We have a ray which bottoms in the interval. Split.
+            cond = path["depth"] == bot_dep
+            idx = np.where(cond)[0][0]
+            path0 = path[0 : idx + 1]
+            path1 = path[idx:]
+            paths.append(path0)
+            paths.append(path1)
+            waves.append(wave)
+            waves.append(wave)
+        else:
+            paths.append(path)
+            waves.append(wave)
+    paths = np.array(paths, dtype=object)
+    waves = np.array(waves, dtype=object)
 
-    # Label the paths that are diffracted rays, these have no change in depth but do have a change in distance
-    diffracted = [np.all(p[:, 3] == p[0, 3]) and p[0][2] != p[-1][2] for p in paths]
-
-    # Remove diffracted segments
-    paths = [p for i, p in enumerate(paths) if not diffracted[i]]
-
-    # Remove segments with repeated bottoming depth that aren't a discontinuity
-    paths = [p for p in paths if bot_dep in discs or not np.all(p[:, 3] == bot_dep)]
-
-    # Get which branch is the the outer core branch
-    oc_branch = branches.index((model.cmb_depth, model.iocb_depth))
-
-    # Wave for each branch in sequence
-    # ObsPy doesnt' always assign the correct wave type for the outer core, so enforce P wave
-    wave_type = [
-        wt if branch_seq[i] != oc_branch else True for i, wt in enumerate(ph.wave_type)
-    ]
-    waves = ["p" if wt else "s" for wt in wave_type]
-
-    # The number of path segments and branches in sequence from ObsPy should always be equal
-    # If not then something has gone wrong
-    assert len(paths) == len(branch_seq)
+    diffracted = waves == "diff"
+    paths = paths[~diffracted]
+    waves = waves[~diffracted]
 
     return paths, waves
+
+
+def expected_travel_time(point0, point1, wave, model):
+    """
+    Expected travel time between two points for a given wave type (p or s).
+    """
+
+    ray_param = point0[0]
+
+    depth0 = point0[3]
+    depth1 = point1[3]
+
+    radius0 = model.radius_of_planet - depth0
+    radius1 = model.radius_of_planet - depth1
+
+    v_mod = model.s_mod.v_mod
+
+    if depth1 >= depth0:
+        v0 = v_mod.evaluate_below(depth0, wave)[0]
+        v1 = v_mod.evaluate_above(depth1, wave)[0]
+        dvdr = -evaluate_derivative_above(v_mod, depth1, wave)[0]
+    else:
+        v0 = v_mod.evaluate_above(depth0, wave)[0]
+        v1 = v_mod.evaluate_below(depth1, wave)[0]
+        dvdr = -evaluate_derivative_below(v_mod, depth1, wave)[0]
+
+    if v0 > 0.0:
+        eta0 = radius0 / v0
+        eta1 = radius1 / v1
+
+        def vertical_slowness(eta, p):
+            y = eta**2 - p**2
+            return np.sqrt(y * (y > 0))  # in s
+
+        n0 = vertical_slowness(eta0, ray_param)
+        n1 = vertical_slowness(eta1, ray_param)
+
+        s0 = v0**-1 * dvdr * radius0
+        s1 = v1**-1 * dvdr * radius1
+
+        k0 = 1.0 / (1.0 - s0)
+        k1 = 1.0 / (1.0 - s1)
+
+        return 0.5 * (k0 + k1) * abs(n1 - n0)
+    return 0.0
+
+
+def classify_path(path, model):
+    """
+    Determine whether we have a p-wave or an s-wave path by comparing travel times.
+    """
+    i, j = 0, 1
+    point0 = path[i]
+    point1 = path[j]
+
+    if point0[3] == point1[3]:
+        # if not changing depth then it is a diffracted/head wave segment
+        return "diff"
+
+    travel_time = point1[1] - point0[1]
+
+    t_p = expected_travel_time(point0, point1, "p", model)
+    t_s = expected_travel_time(point0, point1, "s", model)
+
+    error_p = (t_p / travel_time) - 1.0
+    error_s = (t_s / travel_time) - 1.0
+
+    tol = 1e-4
+    if abs(error_p) < tol:
+        return "p"
+    if abs(error_s) < tol:
+        return "s"
+    raise ValueError("Difficulty with determining ray type.")
 
 
 def integral_coefficients(arrival, model):
@@ -323,7 +380,7 @@ def integral_coefficients(arrival, model):
     for path, wave in zip(paths, waves):
 
         # Depth in km
-        depth = path[:, 3]
+        depth = path["depth"]
         max_depth = np.max(depth)
 
         # Radius in km
@@ -348,7 +405,7 @@ def integral_coefficients(arrival, model):
         epsilon = get_epsilon(model, depth)
 
         # Epicentral distance in radians
-        distance = path[:, 2]
+        distance = path["dist"]
 
         # lambda
         lam = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
