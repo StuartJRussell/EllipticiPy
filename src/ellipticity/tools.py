@@ -254,7 +254,7 @@ def split_ray_path(arrival, model):
     # Split path at discontinuity depths
     full_path = arrival.path
     depths = full_path["depth"]
-    cond = [d in discs for d in depths]
+    cond = np.isin(depths, discs)
     cond[0] = False  # Don't split on first point
     idx = np.where(cond)[0]
 
@@ -264,9 +264,7 @@ def split_ray_path(arrival, model):
     # Classify the waves
     dwaves = [classify_path(path, model) for path in dpaths]
 
-    # Make a further split on the bottoming depths
-    bot_dep = np.max(depths)
-
+    # Construct final path list by splitting on bottoming depths and removing diffracted
     paths = []
     waves = []
     for path, wave in zip(dpaths, dwaves):
@@ -285,20 +283,16 @@ def split_ray_path(arrival, model):
             else:
                 paths.append(path)
                 waves.append(wave)
-    assert(len(paths) == len(waves))
+
+    assert len(paths) == len(waves)
 
     return paths, waves
 
 
-def expected_travel_time(point0, point1, wave, model):
+def expected_travel_time(ray_param, depth0, depth1, wave, model):
     """
-    Expected travel time between two points for a given wave type (p or s).
+    Expected travel time between two depths for a given wave type (p or s).
     """
-
-    ray_param = point0[0]
-
-    depth0 = point0[3]
-    depth1 = point1[3]
 
     radius0 = model.radius_of_planet - depth0
     radius1 = model.radius_of_planet - depth1
@@ -339,18 +333,23 @@ def classify_path(path, model):
     """
     Determine whether we have a p-wave or an s-wave path by comparing travel times.
     """
-    i, j = 0, 1
-    point0 = path[i]
-    point1 = path[j]
+    # Examine just the first two points on the path
+    point0 = path[0]
+    point1 = path[1]
 
-    if point0[3] == point1[3]:
+    ray_param = point0["p"]
+
+    depth0 = point0["depth"]
+    depth1 = point1["depth"]
+
+    if depth0 == depth1:
         # if not changing depth then it is a diffracted/head wave segment
         return "diff"
 
-    travel_time = point1[1] - point0[1]
+    travel_time = point1["time"] - point0["time"]
 
-    t_p = expected_travel_time(point0, point1, "p", model)
-    t_s = expected_travel_time(point0, point1, "s", model)
+    t_p = expected_travel_time(ray_param, depth0, depth1, "p", model)
+    t_s = expected_travel_time(ray_param, depth0, depth1, "s", model)
 
     error_p = (t_p / travel_time) - 1.0
     error_s = (t_s / travel_time) - 1.0
@@ -432,12 +431,12 @@ def discontinuity_contribution(points, phase, model):
     disc_point = points[0]
     neighbour_point = points[1]
 
-    ray_param = disc_point[0]
-    distance = disc_point[2]
-    depth = disc_point[3]
+    ray_param = disc_point["p"]
+    distance = disc_point["dist"]
+    depth = disc_point["depth"]
     radius = model.radius_of_planet - depth
 
-    neighbour_depth = neighbour_point[3]
+    neighbour_depth = neighbour_point["depth"]
 
     if neighbour_depth >= depth:
         v = model.s_mod.v_mod.evaluate_below(depth, phase)[0]
