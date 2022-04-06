@@ -308,13 +308,13 @@ def split_ray_path(arrival, model):
     # Enforce that paths and waves are the same length
     # Something has gone wrong if not
     assert len(paths) == len(waves)
-
+    
     return paths, waves
 
 
 def expected_delay_time(ray_param, depth0, depth1, wave, model):
     """
-    Expected delay time between two depths for a given wave type (p or s).
+    Expected delay time (tau) between two depths for a given wave type (p or s).
     """
 
     # Convert depths to radii
@@ -324,15 +324,13 @@ def expected_delay_time(ray_param, depth0, depth1, wave, model):
     # Velocity model from TauModel
     v_mod = model.s_mod.v_mod
 
-    # Get velocities and dv/dr
+    # Get velocities
     if depth1 >= depth0:
         v0 = v_mod.evaluate_below(depth0, wave)[0]
         v1 = v_mod.evaluate_above(depth1, wave)[0]
-        dvdr = -evaluate_derivative_below(v_mod, depth0, wave)[0]
     else:
         v0 = v_mod.evaluate_above(depth0, wave)[0]
         v1 = v_mod.evaluate_below(depth1, wave)[0]
-        dvdr = -evaluate_derivative_above(v_mod, depth0, wave)[0]
 
     # Calculate time for segment if velocity non-zero - if zero then return zero time
     if v0 > 0.0:
@@ -346,15 +344,18 @@ def expected_delay_time(ray_param, depth0, depth1, wave, model):
             
         n0 = vertical_slowness(eta0, ray_param)
         n1 = vertical_slowness(eta1, ray_param)
-   
-        # Could make this more accurate and use derivative. Trouble if r = 0
-        return 0.5 * abs(n1 + n0)* abs((np.log(radius0)-np.log(radius1)))
+        
+        if ray_param == 0.0:
+            return 0.5 * ((1.0/v0) + (1.0/v1)) * abs(radius1 - radius0)
+        else:
+            return 0.5 * (n0 + n1) * abs(np.log(radius1/radius0))
+            
     return 0.0
 
 
 def classify_path(path, model):
     """
-    Determine whether we have a p-wave or an s-wave path by comparing travel times.
+    Determine whether we have a p-wave or an s-wave path by comparing delay times.
     """
     
     # Examine just the first two points near the shallowest part of the path
@@ -376,12 +377,12 @@ def classify_path(path, model):
     if depth0 == depth1:
         return "diff"
 
-    # Delay time for this segement from ObsPy ray path
+    # Delay time for this segment from ObsPy ray path
     travel_time = point1["time"] - point0["time"]
     distance = abs(point0["dist"] - point1["dist"])
     delay_time = travel_time - ray_param * distance
 
-    # Get the expcected travel time for each wave type
+    # Get the expected delay time for each wave type
     delay_p = expected_delay_time(ray_param, depth0, depth1, "p", model)
     delay_s = expected_delay_time(ray_param, depth0, depth1, "s", model)
     
@@ -389,7 +390,7 @@ def classify_path(path, model):
     error_p = (delay_p / delay_time) - 1.0
     error_s = (delay_s / delay_time) - 1.0
     
-    # Check which wave type matches the given time the best
+    # Check which wave type matches the given delay time the best
     if abs(error_p) < abs(error_s):
         return "p"
     else:
