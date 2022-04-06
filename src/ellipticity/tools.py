@@ -5,10 +5,10 @@ corrections. All functions in this file are called by the main functions
 in the main file.
 """
 
-#Import modules
-import obspy
 import numpy as np
 from scipy.integrate import cumtrapz
+
+import obspy
 
 # Constants
 EARTH_LOD = 86164.0905  # s, length of day of Earth
@@ -17,14 +17,15 @@ G = 6.67408e-11  # m^3 kg^-1 s^-2, universal gravitational constant
 
 def model_epsilon(model, lod=EARTH_LOD):
     """
-    Calculates a profile of ellipticity of figure (epsilon) through a planetary model.
+    Calculates a profile of ellipticity of figure through a planetary model.
 
     :param model: The tau model object
     :type model: :class:`obspy.taup.tau_model.TauModel`
     :param lod: length of day in seconds. Defaults to Earth value
     :type lod: float
-    :returns: Adds arrays of epsilon at top and bottom of each velocity layer as
-        attributes model.s_mod.v_mod.top_epsilon and model.s_mod.v_mod.bot_epsilon
+    :returns: Adds arrays of epsilon (ellipticity of figure)at top and
+        bottom of each velocity layer as attributes
+        model.s_mod.v_mod.top_epsilon and model.s_mod.v_mod.bot_epsilon
     """
 
     # Angular velocity of planet
@@ -36,7 +37,6 @@ def model_epsilon(model, lod=EARTH_LOD):
     # Depth and density information of velocity layers
     v_mod = model.s_mod.v_mod  # velocity_model
     top_depth = v_mod.layers["top_depth"][::-1] * 1e3  # in m
-    bot_depth = v_mod.layers["bot_depth"][::-1] * 1e3  # in m
     top_density = v_mod.layers["top_density"][::-1] * 1e3  # in kg m^-3
     bot_density = v_mod.layers["bot_density"][::-1] * 1e3  # in kg m^-3
     top_radius = a - top_depth
@@ -66,8 +66,8 @@ def model_epsilon(model, lod=EARTH_LOD):
     # Calculate Radau's parameter
     radau = 6.25 * (1 - 3 * y / 2) ** 2 - 1
 
-    # Calculate h
-    # Ratio of centrifugal force and gravity for a particle on the equator at the surface
+    # Calculate h, ratio of centrifugal force and gravity for a particle
+    # on the equator at the surface
     ha = (a**3 * omega**2) / (G * total_mass)
 
     # epsilon at surface
@@ -99,7 +99,7 @@ def get_epsilon(model, depth):
 
     if isinstance(depth, float):
         depth = np.array([depth])
-    
+
     # Velocity model from TauModel
     v_mod = model.s_mod.v_mod
 
@@ -116,35 +116,33 @@ def get_epsilon(model, depth):
     bot_eps = v_mod.bot_epsilon[layer_idx]
     top_eps = v_mod.top_epsilon[layer_idx]
     slope = (bot_eps - top_eps) / thick
-    
+
     return slope * (depth - layer["top_depth"]) + top_eps
 
 
 def evaluate_derivative_below(model, depth, prop):
     """
-    Evaluate depth derivative of material property at bottom of a velocity layer.
+    Depth derivative of material property at bottom of a velocity layer.
     """
 
     # Get the appropriate slowness layer
-    # Velocity gradient is constant in any slowness layer
     layer = model.layers[model.layer_number_below(depth)]
     return evaluate_derivative_at(layer, prop)
 
 
 def evaluate_derivative_above(model, depth, prop):
     """
-    Evaluate depth derivative of material property at top of a velocity layer.
+    Depth derivative of material property at top of a velocity layer.
     """
 
     # Get the appropriate slowness layer
-    # Velocity gradient is constant in any slowness layer
     layer = model.layers[model.layer_number_above(depth)]
     return evaluate_derivative_at(layer, prop)
 
 
 def evaluate_derivative_at(layer, prop):
     """
-    Evaluate depth derivative of material property in a velocity layer.
+    Depth derivative of material property in a velocity layer.
     """
 
     # Get the velocity gradient from the slowness layer
@@ -165,7 +163,7 @@ def evaluate_derivative_at(layer, prop):
 
 def weighted_alp2(m, theta):
     """
-    The weighted degree 2 associated Legendre polynomial for a given order and value.
+    The weighted degree 2 associated Legendre polynomial.
 
     :param m: order of polynomial (0, 1, or 2)
     :type m: int
@@ -178,12 +176,13 @@ def weighted_alp2(m, theta):
 
     # Kronecker delta
     kronecker_0m = 1 if m == 0 else 0
-    
+
     # Pre-factor for polynomial - Schmidt semi-normalisation
     norm = np.sqrt(
-        (2 - kronecker_0m) * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
+        (2 - kronecker_0m)
+        * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
     )
-    
+
     # Return polynomial of degree 2 and order m
     if m == 0:
         return norm * 0.5 * (3.0 * np.cos(theta) ** 2 - 1.0)
@@ -224,15 +223,18 @@ def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
         model = arrivals.model
 
     # Get coefficients for each arrival individually
-    return [individual_ellipticity_coefficients(arr, model, lod) for arr in arrivals]
+    return [
+        individual_ellipticity_coefficients(arr, model, lod)
+        for arr in arrivals
+    ]
 
 
 def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     """
     Ellipticity coefficients for a single ray path.
 
-    :param arrivals: TauP Arrival object with ray path calculated.
-    :type arrivals: :class:`obspy.taup.helper_classes.Arrival`
+    :param arrival: TauP Arrival object with ray path calculated.
+    :type arrival: :class:`obspy.taup.helper_classes.Arrival`
     :param model: Tau model used to calculate the arrival
     :type model: :class:`obspy.taup.tau_model.TauModel`
     :param lod: optional, length of day in seconds. Defaults to Earth value
@@ -250,14 +252,15 @@ def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     # Calculate epsilon values if they don't already exist
     if not hasattr(model.s_mod.v_mod, "top_epsilon"):
         model_epsilon(model, lod)
-    
+
     # Coefficients from continuous ray path
     ray_sigma = integral_coefficients(arrival, model)
-    
+
     # Coefficients from discontinuities
     disc_sigma = discontinuity_coefficients(arrival, model)
 
-    # Sum the contribution from the ray path and the discontinuities to get final coefficients
+    # Sum the contribution from the ray path and the discontinuities
+    # to get final coefficients
     sigma = [ray_sigma[m] + disc_sigma[m] for m in [0, 1, 2]]
 
     return sigma
@@ -277,15 +280,18 @@ def split_ray_path(arrival, model):
     is_disc = np.isin(depths, discs)
     is_disc[0] = False  # Don't split on first point
     idx = np.where(is_disc)[0]
-    
+
     # Split ray paths, including start and end points
     splitted = np.split(full_path, idx)
-    dpaths = [np.append(s, splitted[i + 1][0]) for i, s in enumerate(splitted[:-1])]
+    dpaths = [
+        np.append(s, splitted[i + 1][0]) for i, s in enumerate(splitted[:-1])
+    ]
 
     # Classify the waves - P or S
     dwaves = [classify_path(path, model) for path in dpaths]
 
-    # Construct final path list by splitting on bottoming depths and removing diffracted segments
+    # Construct final path list by splitting on bottoming depths
+    # and removing diffracted segments
     paths = []
     waves = []
     for path, wave in zip(dpaths, dwaves):
@@ -295,7 +301,7 @@ def split_ray_path(arrival, model):
                 # We have a ray which bottoms in the interval. Split.
                 is_bottom = path["depth"] == bot_dep
                 idx = np.where(is_bottom)[0][0]
-                path0 = path[0 : idx + 1]
+                path0 = path[0: idx + 1]
                 path1 = path[idx:]
                 paths.append(path0)
                 paths.append(path1)
@@ -304,17 +310,17 @@ def split_ray_path(arrival, model):
             else:
                 paths.append(path)
                 waves.append(wave)
-    
+
     # Enforce that paths and waves are the same length
     # Something has gone wrong if not
     assert len(paths) == len(waves)
-    
+
     return paths, waves
 
 
 def expected_delay_time(ray_param, depth0, depth1, wave, model):
     """
-    Expected delay time (tau) between two depths for a given wave type (p or s).
+    Expected delay time between two depths for a given wave type (p or s).
     """
 
     # Convert depths to radii
@@ -332,32 +338,32 @@ def expected_delay_time(ray_param, depth0, depth1, wave, model):
         v0 = v_mod.evaluate_above(depth0, wave)[0]
         v1 = v_mod.evaluate_below(depth1, wave)[0]
 
-    # Calculate time for segment if velocity non-zero - if zero then return zero time
+    # Calculate time for segment if velocity non-zero
+    # - if velocity zero then return zero time
     if v0 > 0.0:
-        
+
         eta0 = radius0 / v0
         eta1 = radius1 / v1
-        
+
         def vertical_slowness(eta, p):
             y = eta**2 - p**2
             return np.sqrt(y * (y > 0))  # in s
-            
+
         n0 = vertical_slowness(eta0, ray_param)
         n1 = vertical_slowness(eta1, ray_param)
-        
+
         if ray_param == 0.0:
-            return 0.5 * ((1.0/v0) + (1.0/v1)) * abs(radius1 - radius0)
-        else:
-            return 0.5 * (n0 + n1) * abs(np.log(radius1/radius0))
-            
+            return 0.5 * ((1.0 / v0) + (1.0 / v1)) * abs(radius1 - radius0)
+        return 0.5 * (n0 + n1) * abs(np.log(radius1 / radius0))
+
     return 0.0
 
 
 def classify_path(path, model):
     """
-    Determine whether we have a p-wave or an s-wave path by comparing delay times.
+    Determine whether we have a p or s-wave path by comparing delay times.
     """
-    
+
     # Examine just the first two points near the shallowest part of the path
     if path[0]["depth"] < path[-1]["depth"]:
         point0 = path[0]
@@ -365,14 +371,14 @@ def classify_path(path, model):
     else:
         point0 = path[-2]
         point1 = path[-1]
-    
+
     # Ray parameter
     ray_param = point0["p"]
 
     # Depths
     depth0 = point0["depth"]
     depth1 = point1["depth"]
-    
+
     # If no change in depth then this is a diffracted/head wave segment
     if depth0 == depth1:
         return "diff"
@@ -385,16 +391,15 @@ def classify_path(path, model):
     # Get the expected delay time for each wave type
     delay_p = expected_delay_time(ray_param, depth0, depth1, "p", model)
     delay_s = expected_delay_time(ray_param, depth0, depth1, "s", model)
-    
+
     # Difference between predictions and given delay times
     error_p = (delay_p / delay_time) - 1.0
     error_s = (delay_s / delay_time) - 1.0
-    
+
     # Check which wave type matches the given delay time the best
     if abs(error_p) < abs(error_s):
         return "p"
-    else:
-        return "s"
+    return "s"
 
 
 def integral_coefficients(arrival, model):
@@ -448,7 +453,9 @@ def integral_coefficients(arrival, model):
         # Do the integration
         s = v**-1 * dvdr * radius
         integral = [
-            np.trapz((s / (1.0 - s)) * epsilon * sign * lam[m], x=vertical_slowness)
+            np.trapz(
+                (s / (1.0 - s)) * epsilon * sign * lam[m], x=vertical_slowness
+            )
             for m in [0, 1, 2]
         ]
 
@@ -462,17 +469,17 @@ def discontinuity_contribution(points, phase, model):
     """
     Ellipticity coefficients due to an individual discontinuity.
     """
-    
+
     # Use closest points to the boundary
     disc_point = points[0]
     neighbour_point = points[1]
-    
+
     # Ray parameter
     ray_param = disc_point["p"]
-    
+
     # Distance in radians
     distance = disc_point["dist"]
-    
+
     # Radius in km
     depth = disc_point["depth"]
     radius = model.radius_of_planet - depth
@@ -488,7 +495,7 @@ def discontinuity_contribution(points, phase, model):
     eta = radius / v
     y = eta**2 - ray_param**2
     vertical_slowness = np.sqrt(y * (y > 0))
-    
+
     # If ray does not change depth then this should have no contribution
     if neighbour_depth == depth:
         vertical_slowness = 0.0
@@ -503,7 +510,9 @@ def discontinuity_contribution(points, phase, model):
     lam = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
 
     # Coefficients for this discontinuity
-    sigma = np.array([-sign * vertical_slowness * epsilon * lam[m] for m in [0, 1, 2]])
+    sigma = np.array(
+        [-sign * vertical_slowness * epsilon * lam[m] for m in [0, 1, 2]]
+    )
 
     return sigma
 
@@ -521,11 +530,11 @@ def discontinuity_coefficients(arrival, model):
     for path, wave in zip(paths, waves):
         start_points = (path[0], path[1])
         end_points = (path[-1], path[-2])
-        
+
         # Contributions from each end of the ray path segment
         start = discontinuity_contribution(start_points, wave, model)
         end = discontinuity_contribution(end_points, wave, model)
-        
+
         # Overall contribution
         sigmas.append(start + end)
 
