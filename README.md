@@ -20,13 +20,23 @@ The package can be installed using pip the same as many python packages:
 pip install ellipticity
 ```
 
-## Requirements
+This package depends on ObsPy. For information regarding ObsPy please see the relevant documentation: https://docs.obspy.org/
 
-Please see requirements.txt
+## Usage
+
+```
+>>> from obspy.taup import TauPyModel
+>>> from ellipticity import ellipticity\_correction
+>>> model = TauPyModel('prem')
+>>> arrivals = model.get\_ray_paths(source\_depth\_in\_km = 124,
+    distance\_in\_degree = 65, phase\_list = ['pPKiKP'])
+>>> ellipticity\_correction(arrivals, azimuth = 39, source\_latitude = 45)
+[-0.7761560510457043]
+```
 
 ## Examples
 
-Examples of usual code usage in Jupyter Notebook format can be found in src/
+Further examples of code usage in Jupyter Notebook format can be found in src/
 
 - example\_get\_corrections.ipynb
 - example\_Mars.ipynb
