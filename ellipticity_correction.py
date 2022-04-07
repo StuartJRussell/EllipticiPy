@@ -54,13 +54,14 @@ times = [arrivals[i].time + corrections[i] for i in range(len(arrivals))]
 
 # Create an output message
 line0 = "Model: " + args.model
-line1 = " Distance    Depth     Phase         Spherical    Ellipticity      Elliptical"
-line2 = "   (deg)      (km)     Name          Travel       Correction       Travel    "
-line3 = "                                     Time (s)         (s)          Time (s)  "
-line4 = "-----------------------------------------------------------------------------"
+line1 = " Distance    Depth     Phase         Ray Param     Spherical    Ellipticity      Elliptical"
+line2 = "   (deg)      (km)     Name          p (s/deg)     Travel       Correction       Travel    "
+line3 = "                                                   Time (s)         (s)          Time (s)  "
+line4 = "------------------------------------------------------------------------------------------"
 lines = [str(round(args.distance, 2)).rjust(9, " ") + str(round(args.depth, 2)).rjust(9, " ") + "     " + 
-          arrivals[i].name.ljust(14, " ") + str(round(arrivals[i].time, 2)).rjust(9, " ") + 
-          str(round(corrections[i], 2)).rjust(15, " ") + str(round(times[i], 2)).rjust(16, " ")
+          arrivals[i].name.ljust(14, " ") + str(round(arrivals[i].ray_param_sec_degree, 3)).rjust(9, " ") + 
+          str(round(arrivals[i].time, 2)).rjust(13, " ") +  str(round(corrections[i], 2)).rjust(14, " ") + 
+          str(round(times[i], 2)).rjust(16, " ")
           for i in range(len(arrivals))]
 message0 = "\n".join([line0, line1, line2, line3, line4])
 message1 = "\n".join(lines)
