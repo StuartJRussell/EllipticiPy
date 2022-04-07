@@ -8,29 +8,26 @@ Authors:
 - John F. Rudge
 - Sanne Cottaar
 
-## Structure
-
-### README.md
-
-This file.
-
-### requirements.txt
-
-Software requirements of this package.
-
-### LICENSE
+## LICENSE
 
 License for this package - standard LGPL license.
 
-### pyproject.toml and setup.cfg
+## Installation
 
-Files that enable the package to be installed using pip. These should not be edited.
+The package can be installed using pip the same as many python packages:
 
-### src/ellipticity/main.py
+```
+pip install ellipticity
+```
 
-Main functions for users to interact with.
+## Requirements
 
-### src/ellipticity/tools.py
+Please see requirements.txt
 
-Other functions that are required by main.py but that the user shouldn't need to interact with during normal usage.
+## Examples
 
+Examples of usual code usage can be found in src/
+
+There are severeal *.ipynb files. These are example codes in Jupyter Notebook format.
+
+An example velocity model of Mars, as used by example\_mars.ipynb, is in the mars\_model directory
