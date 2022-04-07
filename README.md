@@ -8,6 +8,12 @@ Authors:
 - John F. Rudge
 - Sanne Cottaar
 
+The workings of this package are described in:
+
+insertpaperhere
+
+Please cit this publication when publishing work that has made use of this package.
+
 ## LICENSE
 
 License for this package - standard LGPL license.
