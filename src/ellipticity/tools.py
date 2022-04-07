@@ -290,26 +290,9 @@ def split_ray_path(arrival, model):
     # Classify the waves - P or S
     dwaves = [classify_path(path, model) for path in dpaths]
 
-    # Construct final path list by splitting on bottoming depths
-    # and removing diffracted segments
-    paths = []
-    waves = []
-    for path, wave in zip(dpaths, dwaves):
-        if wave != "diff":
-            bot_dep = np.max(path["depth"])
-            if bot_dep not in (path["depth"][0], path["depth"][-1]):
-                # We have a ray which bottoms in the interval. Split.
-                is_bottom = path["depth"] == bot_dep
-                idx = np.where(is_bottom)[0][0]
-                path0 = path[0 : idx + 1]
-                path1 = path[idx:]
-                paths.append(path0)
-                paths.append(path1)
-                waves.append(wave)
-                waves.append(wave)
-            else:
-                paths.append(path)
-                waves.append(wave)
+    # Construct final path list by removing diffracted segments
+    paths = [p for p, w in zip(dpaths, dwaves) if w != "diff"]
+    waves = [w for p, w in zip(dpaths, dwaves) if w != "diff"]
 
     # Enforce that paths and waves are the same length
     # Something has gone wrong if not
