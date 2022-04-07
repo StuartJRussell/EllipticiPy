@@ -60,8 +60,8 @@ line1 = " Distance    Depth     Phase         Ray Param     Spherical    Ellipti
 line2 = "   (deg)      (km)     Name          p (s/deg)     Travel       Correction       Travel    "
 line3 = "                                                   Time (s)         (s)          Time (s)  "
 line4 = "------------------------------------------------------------------------------------------"
-lines = [str(round(args.distance, 2)).rjust(9, " ") + str(round(args.depth, 2)).rjust(9, " ") + "     " + 
-          arrivals[i].name.ljust(14, " ") + str(round(arrivals[i].ray_param_sec_degree, 3)).rjust(9, " ") + 
+lines = [str(round(arrivals[i].purist_distance, 2)).rjust(9, " ") + str(round(arrivals[i].source_depth, 2)).rjust(9, " ") 
+          + "     " + arrivals[i].name.ljust(14, " ") + str(round(arrivals[i].ray_param_sec_degree, 3)).rjust(9, " ") + 
           str(round(arrivals[i].time, 2)).rjust(13, " ") +  str(round(corrections[i], 2)).rjust(14, " ") + 
           str(round(times[i], 2)).rjust(16, " ")
           for i in range(len(arrivals))]
