@@ -5,7 +5,11 @@ ellipticity correction for a seismic ray path in a given model.
 """
 
 from obspy.taup import TauPyModel
-from .tools import ellipticity_coefficients, correction_from_coefficients, EARTH_LOD
+from .tools import (
+    ellipticity_coefficients,
+    correction_from_coefficients,
+    EARTH_LOD,
+)
 
 
 def ellipticity_correction(
@@ -57,7 +61,10 @@ def ellipticity_correction(
     sigma = ellipticity_coefficients(arrivals, model, lod)
 
     # Calculate time
-    dt = [correction_from_coefficients(sig, azimuth, source_latitude) for sig in sigma]
+    dt = [
+        correction_from_coefficients(sig, azimuth, source_latitude)
+        for sig in sigma
+    ]
 
     return dt
 
@@ -76,5 +83,5 @@ def ellip_corr(
     arrivals = model.get_ray_paths(
         source_depth_in_km, distance_in_degree, phase_list=[phase]
     )
-    dt = ellipticity_correction(arrivals, azimuth, source_latitude, lod=EARTH_LOD)
+    dt = ellipticity_correction(arrivals, azimuth, source_latitude, lod=lod)
     return dt[0]

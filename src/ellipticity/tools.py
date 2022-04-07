@@ -8,7 +8,8 @@ in the main file.
 import numpy as np
 from scipy.integrate import cumtrapz
 
-import obspy
+from obspy.taup import TauPyModel
+from obspy.taup.tau import TauModel
 
 # Constants
 EARTH_LOD = 86164.0905  # s, length of day of Earth
@@ -244,9 +245,9 @@ def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
     """
 
     # Ensure that model is TauModel
-    if isinstance(model, obspy.taup.tau.TauPyModel):
+    if isinstance(model, TauPyModel):
         model = model.model
-    if not isinstance(model, obspy.taup.tau_model.TauModel):
+    if not isinstance(model, TauModel):
         raise TypeError("Velocity model not correct type")
 
     # Calculate epsilon values if they don't already exist
