@@ -26,8 +26,9 @@ Please see requirements.txt
 
 ## Examples
 
-Examples of usual code usage can be found in src/
+Examples of usual code usage in Jupyter Notebook format can be found in src/
 
-There are severeal *.ipynb files. These are example codes in Jupyter Notebook format.
+- example\_get\_corrections.ipynb
+- example\_Mars.ipynb
 
-An example velocity model of Mars, as used by example\_mars.ipynb, is in the mars\_model directory
+An example velocity model of Mars, as used by example\_mars.ipynb, is in the mars\_model directory.
