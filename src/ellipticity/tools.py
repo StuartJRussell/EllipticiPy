@@ -301,7 +301,7 @@ def split_ray_path(arrival, model):
                 # We have a ray which bottoms in the interval. Split.
                 is_bottom = path["depth"] == bot_dep
                 idx = np.where(is_bottom)[0][0]
-                path0 = path[0: idx + 1]
+                path0 = path[0 : idx + 1]
                 path1 = path[idx:]
                 paths.append(path0)
                 paths.append(path1)
@@ -447,19 +447,17 @@ def integral_coefficients(arrival, model):
 
         # Vertical slowness
         y = eta**2 - arrival.ray_param**2
-        sign = np.sign(y[-1] - y[0])  # figure out if going up or down
         vertical_slowness = np.sqrt(y * (y > 0))  # in s
 
-        # Do the integration
-        s = v**-1 * dvdr * radius
-        integral = [
-            np.trapz(
-                (s / (1.0 - s)) * epsilon * sign * lam[m], x=vertical_slowness
-            )
-            for m in [0, 1, 2]
-        ]
+        # Do the integration by trapezoidal rule
+        def integration(m):
+            integrand = (eta * dvdr / (1.0 - eta * dvdr)) * epsilon * lam[m]
+            top = integrand[1:]
+            bot = integrand[:-1]
+            delta = abs(vertical_slowness[1:] - vertical_slowness[:-1])
+            return np.sum(0.5 * (top + bot) * delta)
 
-        sigmas.append(integral)
+        sigmas.append([integration(m) for m in [0, 1, 2]])
 
     # Sum coefficients for each segment to get total ray path contribution
     return [np.sum([s[m] for s in sigmas]) for m in [0, 1, 2]]
