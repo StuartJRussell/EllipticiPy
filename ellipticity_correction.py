@@ -19,19 +19,21 @@ warnings.filterwarnings("ignore", message="Resizing a TauP array inplace failed 
 parser = argparse.ArgumentParser()
 
 # Float arguments - source depth, epicentral distance, azimuth, source latitude and length of day
-parser.add_argument("-d", "--depth", type=float,
+parser.add_argument("-d", "--depth", type=float, required=True,
                      help="Source depth in km")
-parser.add_argument("-deg", "--distance", type=float,
+parser.add_argument("-deg", "--distance", type=float, required=True,
                      help="Epicentral distance in degrees")
-parser.add_argument("-az", "--azimuth", type=float,
+parser.add_argument("-az", "--azimuth", type=float, required=True,
                      help="Azimuth from source to receiver in degrees from N")
-parser.add_argument("-sl", "--latitude", type=float,
+parser.add_argument("-sl", "--latitude", type=float, required=True,
                      help="Source latitude in degrees")
+parser.add_argument("-lod", "--period", type=float, default=EARTH_LOD,
+                     help="Length of day in seconds")
 
 #String arguments
-parser.add_argument("-ph", "--phase", type=str,
+parser.add_argument("-ph", "--phase", type=str, required=True,
                      help="TauP phase names - if several then seperate by commas")
-parser.add_argument("-mod", "--model", type=str,
+parser.add_argument("-mod", "--model", type=str, required=True,
                      help="Velocity model")
 
 # Pass arguments
@@ -47,7 +49,7 @@ phases = args.phase.split(',')
 arrivals = model.get_ray_paths(source_depth_in_km = args.depth, distance_in_degree = args.distance, phase_list = phases)
 
 # Calculate ellipticity corrections
-corrections = ellipticity_correction(arrivals, args.azimuth, args.latitude, lod=EARTH_LOD)
+corrections = ellipticity_correction(arrivals, args.azimuth, args.latitude, lod=args.period)
 
 # Final travel times
 times = [arrivals[i].time + corrections[i] for i in range(len(arrivals))]
@@ -69,7 +71,6 @@ message = message0 + "\n" + message1
 
 # Output
 print(message)
-
 
 
 
