@@ -4,7 +4,6 @@ This file contains the necessary function for a user to calculate an
 ellipticity correction for a seismic ray path in a given model.
 """
 
-from obspy.taup import TauPyModel
 from .tools import (
     ellipticity_coefficients,
     correction_from_coefficients,
