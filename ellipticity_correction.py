@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 """
 Python wrapper that runs the ellipticity correction package based on a command line input.
