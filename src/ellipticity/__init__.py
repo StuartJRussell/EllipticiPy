@@ -20,7 +20,9 @@ Functions:
 """
 
 __version__ = "0.9"
-__author__ = "Stuart Russell, John F Rudge, Jessica C. E. Irving, Sanne Cottaar"
+__author__ = (
+    "Stuart Russell, John F Rudge, Jessica C. E. Irving, Sanne Cottaar"
+)
 
 # Import functions
-from .main import ellipticity_correction, ellip_corr
+from .main import ellipticity_correction
