@@ -194,12 +194,14 @@ def weighted_alp2(m, theta):
     raise ValueError("Invalid value of m")
 
 
-def ellipticity_coefficients(arrivals, lod=EARTH_LOD):
+def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
     """
     Ellipticity coefficients for a set of arrivals.
 
     :param arrivals: TauP Arrivals object with ray paths calculated.
     :type arrivals: :class:`obspy.taup.tau.Arrivals`
+    :param model: optional, model used to calculate the arrivals
+    :type model: :class:`obspy.taup.tau_model.TauModel`
     :param lod: optional, length of day in seconds. Defaults to Earth value
     :type lod: float
     :returns: list of lists of three floats, ellipticity coefficients
@@ -216,9 +218,11 @@ def ellipticity_coefficients(arrivals, lod=EARTH_LOD):
     [[-0.9323682254592675, -0.6888598392172868, -0.8824096866702915]]
     """
 
-    # Get TauModel from Arrivals object
-    model = arrivals.model
 
+    # If model not specified then obtain via Arrivals
+    if model is None:
+        model = arrivals.model
+        
     # Get coefficients for each arrival individually
     return [
         individual_ellipticity_coefficients(arr, model, lod)
