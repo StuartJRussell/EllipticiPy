@@ -30,6 +30,8 @@ This package depends on ObsPy. For information regarding ObsPy please see the re
 
 ## Usage
 
+This package is intended to be used in Python
+
 ```
 >>> from obspy.taup import TauPyModel
 >>> from ellipticity import ellipticity\_correction
@@ -38,6 +40,20 @@ This package depends on ObsPy. For information regarding ObsPy please see the re
     distance\_in\_degree = 65, phase\_list = ['pPKiKP'])
 >>> ellipticity\_correction(arrivals, azimuth = 39, source\_latitude = 45)
 [-0.7761560510457043]
+```
+
+For users that do not wish to directly interact with Python, there is a command line wrapper although this is substantially less efficient.
+
+```
+>>> ./ellipticity_correction.py -d 134 -deg 64 -az 15 -sl 23 -ph P,PcP,PKiKP -mod ak135
+Model: ak135
+ Distance    Depth     Phase         Ray Param     Spherical    Ellipticity      Elliptical
+   (deg)      (km)     Name          p (s/deg)     Travel       Correction       Travel
+                                                   Time (s)         (s)          Time (s)
+-------------------------------------------------------------------------------------------
+     64.0    134.0     P                 6.536       619.05         -0.45          618.61
+     64.0    134.0     PcP                4.11       653.31         -0.48          652.83
+     64.0    134.0     PKiKP             1.307      1020.55         -0.75          1019.8
 ```
 
 ## Examples
