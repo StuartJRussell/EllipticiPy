@@ -2,6 +2,28 @@
 
 """
 Python wrapper that runs the ellipticity correction package based on a command line input.
+
+Required inputs
+    -d    --depth       type: float     Source depth in km
+    -deg  --distance    type: float     Epicentral distance in degrees
+    -az   --azimuth     type: float     Azimuth from source to receiver in degrees from N
+    -sl   --latitude    type: float     Source latitude in degrees
+    -ph   --phase       type: string    TauP phase names - if several then seperate by commas
+    -mod  --model       type: string    Velocity model to use
+    
+Optional inputs
+    -lod  --period      type: float     Length of day in seconds
+
+Example usage:
+    >>> ./ellipticity_correction.py -d 134 -deg 64 -az 15 -sl 23 -ph P,PcP,PKiKP -mod ak135
+    Model: ak135
+     Distance    Depth     Phase         Ray Param     Spherical    Ellipticity      Elliptical
+       (deg)      (km)     Name          p (s/deg)     Travel       Correction       Travel
+                                                       Time (s)         (s)          Time (s)
+    -------------------------------------------------------------------------------------------
+         64.0    134.0     P                 6.536       619.05         -0.45          618.61
+         64.0    134.0     PcP                4.11       653.31         -0.48          652.83
+         64.0    134.0     PKiKP             1.307      1020.55         -0.75          1019.8
 """
 
 # Import modules and the main package
@@ -34,7 +56,7 @@ parser.add_argument("-lod", "--period", type=float, default=EARTH_LOD,
 parser.add_argument("-ph", "--phase", type=str, required=True,
                      help="TauP phase names - if several then seperate by commas")
 parser.add_argument("-mod", "--model", type=str, required=True,
-                     help="Velocity model")
+                     help="Velocity model to use")
 
 # Pass arguments
 args = parser.parse_args()
@@ -51,7 +73,7 @@ arrivals = model.get_ray_paths(source_depth_in_km = args.depth, distance_in_degr
 # Calculate ellipticity corrections
 corrections = ellipticity_correction(arrivals, args.azimuth, args.latitude, lod=args.period)
 
-# Final travel times
+# Corrected travel times
 times = [arrivals[i].time + corrections[i] for i in range(len(arrivals))]
 
 # Create an output message
@@ -59,7 +81,7 @@ line0 = "Model: " + args.model
 line1 = " Distance    Depth     Phase         Ray Param     Spherical    Ellipticity      Elliptical"
 line2 = "   (deg)      (km)     Name          p (s/deg)     Travel       Correction       Travel    "
 line3 = "                                                   Time (s)         (s)          Time (s)  "
-line4 = "------------------------------------------------------------------------------------------"
+line4 = "-------------------------------------------------------------------------------------------"
 lines = [str(round(arrivals[i].purist_distance, 2)).rjust(9, " ") + str(round(arrivals[i].source_depth, 2)).rjust(9, " ") 
           + "     " + arrivals[i].name.ljust(14, " ") + str(round(arrivals[i].ray_param_sec_degree, 3)).rjust(9, " ") + 
           str(round(arrivals[i].time, 2)).rjust(13, " ") +  str(round(corrections[i], 2)).rjust(14, " ") + 
