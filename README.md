@@ -34,11 +34,11 @@ This package is intended to be used in Python
 
 ```
 >>> from obspy.taup import TauPyModel
->>> from ellipticity import ellipticity\_correction
+>>> from ellipticity import ellipticity_correction
 >>> model = TauPyModel('prem')
->>> arrivals = model.get\_ray_paths(source\_depth\_in\_km = 124,
-    distance\_in\_degree = 65, phase\_list = ['pPKiKP'])
->>> ellipticity\_correction(arrivals, azimuth = 39, source\_latitude = 45)
+>>> arrivals = model.get_ray_paths(source_depth_in_km = 124,
+    distance_in_degree = 65, phase_list = ['pPKiKP'])
+>>> ellipticity_correction(arrivals, azimuth = 39, source_latitude = 45)
 [-0.7761560510457043]
 ```
 

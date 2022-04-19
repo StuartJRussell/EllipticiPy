@@ -9,7 +9,7 @@ Required inputs
     -az   --azimuth     type: float     Azimuth from source to receiver in degrees from N
     -sl   --latitude    type: float     Source latitude in degrees
     -ph   --phase       type: string    TauP phase names - if several then seperate by commas
-    -mod  --model       type: string    Velocity model to use
+    -mod  --model       type: string    Velocity model to use, e.g. PREM, ak135, iasp91, etc.
     
 Optional inputs
     -lod  --period      type: float     Length of day in seconds
@@ -56,7 +56,7 @@ parser.add_argument("-lod", "--period", type=float, default=EARTH_LOD,
 parser.add_argument("-ph", "--phase", type=str, required=True,
                      help="TauP phase names - if several then seperate by commas")
 parser.add_argument("-mod", "--model", type=str, required=True,
-                     help="Velocity model to use")
+                     help="Velocity model to use, e.g. PREM, ak135, iasp91, etc.")
 
 # Pass arguments
 args = parser.parse_args()
