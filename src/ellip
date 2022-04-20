@@ -10,13 +10,13 @@ Required inputs
     -sl   --latitude    type: float     Source latitude in degrees
     -ph   --phase       type: string    TauP phase names - if several then seperate by commas
     -mod  --model       type: string    Velocity model to use, e.g. PREM, ak135, iasp91, etc.
-    
+
 Optional inputs
     -lod  --period      type: float     Length of day in seconds
 
 Example usage:
     > ./ellip -d 134 -deg 64 -az 15 -sl 23 -ph P,PcP,PKiKP -mod ak135
-    
+
     Model: ak135
      Distance    Depth     Phase         Ray Param     Spherical    Ellipticity      Elliptical
        (deg)      (km)     Name          p (s/deg)     Travel       Correction       Travel
@@ -28,7 +28,6 @@ Example usage:
 """
 
 # Import modules and the main package
-import sys
 import argparse
 import warnings
 from obspy.taup import TauPyModel
@@ -45,9 +44,7 @@ warnings.filterwarnings(
 parser = argparse.ArgumentParser()
 
 # Float arguments - source depth, epicentral distance, azimuth, source latitude and length of day
-parser.add_argument(
-    "-d", "--depth", type=float, default=0.0, help="Source depth in km"
-)
+parser.add_argument("-d", "--depth", type=float, default=0.0, help="Source depth in km")
 parser.add_argument(
     "-deg",
     "--distance",

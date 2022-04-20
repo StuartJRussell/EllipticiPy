@@ -63,7 +63,7 @@ Further examples of code usage in Jupyter Notebook format can be found in [src/]
 - [src/example_coefficients.ipynb](src/example_coefficients.ipynb)
 - [src/ellipticity_of_figure.ipynb](src/ellipticity_of_figure.ipynb)
 
-An example velocity model of Mars, as used by [src/example_Mars.ipynb](src/example_Mars.ipynb), is in [src/mars_model/mars1.npz](src/example_Mars.ipynb).
+An example velocity model of Mars, as used by [src/example_Mars.ipynb](src/example_Mars.ipynb), is in [src/mars_model/mars1.npz](src/mars_model/mars1.npz).
 
 
 ## License
