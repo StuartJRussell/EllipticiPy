@@ -33,12 +33,12 @@ def ellipticity_correction(arrivals, azimuth, source_latitude, model=None, lod=E
     Usage:
 
     >>> from obspy.taup import TauPyModel
-    >>> from ellipticity import ellipticity_correction
+    >>> from ellipticipy import ellipticity_correction
     >>> model = TauPyModel('prem')
     >>> arrivals = model.get_ray_paths(source_depth_in_km = 124,
         distance_in_degree = 65, phase_list = ['pPKiKP'])
     >>> ellipticity_correction(arrivals, azimuth = 39, source_latitude = 45)
-    [-0.7761560510457043]
+    [-0.7760469283015952]
     """
     
     # Get model from arrivals object if model is None

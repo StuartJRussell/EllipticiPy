@@ -210,12 +210,12 @@ def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
     Usage:
 
     >>> from obspy.taup import TauPyModel
-    >>> from ellipticity.tools import ellipticity_coefficients
+    >>> from ellipticipy.tools import ellipticity_coefficients
     >>> model = TauPyModel('prem')
     >>> arrivals = model.get_ray_paths(source_depth_in_km = 124,
         distance_in_degree = 65, phase_list = ['pPKiKP'])
     >>> ellipticity_coefficients(arrivals)
-    [[-0.9323682254592675, -0.6888598392172868, -0.8824096866702915]]
+    [[-0.9322726492103899, -0.6887388908599743, -0.8823671774932877]]
     """
 
 
