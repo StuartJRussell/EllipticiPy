@@ -1,6 +1,6 @@
-## About
+# EllipticiPy
 
-EllipticiPy: a python package for the calculation of ellipticity corrections for seismic phases in elliptical planetary models.
+A python package for the calculation of ellipticity corrections for seismic phases in elliptical planetary models.
 
 Authors:
 - Stuart Russell
@@ -27,22 +27,22 @@ This package depends on ObsPy. For information regarding ObsPy please see the re
 
 ## Usage
 
-This package is intended to be used in Python
+This package is intended to be used in Python:
 
 ```
 >>> from obspy.taup import TauPyModel
->>> from ellipticity import ellipticity_correction
+>>> from ellipticipy import ellipticity_correction
 >>> model = TauPyModel('prem')
 >>> arrivals = model.get_ray_paths(source_depth_in_km = 124,
     distance_in_degree = 65, phase_list = ['pPKiKP'])
 >>> ellipticity_correction(arrivals, azimuth = 39, source_latitude = 45)
-[-0.7761560510457043]
+[-0.7760469283015952]
 ```
 
-For users that do not wish to directly interact with Python, there is a command line wrapper for calculating ellipticity correction in [src/ellip](src/ellip). The Python package must be installed before the wrapper can be used.
+For users that do not wish to directly interact with Python, there is a command line wrapper for calculating ellipticity corrections in [src/ellip](src/ellip). The Python package must be installed before the wrapper can be used.
 
 ```
-    > ./ellip -d 134 -deg 64 -az 15 -sl 23 -ph P,PcP,PKiKP -mod ak135
+> ./ellip -d 134 -deg 64 -az 15 -sl 23 -ph P,PcP,PKiKP -mod ak135
     
 Model: ak135
  Distance    Depth     Phase         Ray Param     Spherical    Ellipticity      Elliptical
@@ -56,14 +56,14 @@ Model: ak135
 
 ## Examples
 
-Further examples of code usage in Jupyter Notebook format can be found in [src/](src/). The first of these shows the main usage.
+Further examples of code usage in Jupyter Notebook format can be found in [src/](src/). The first of these demonstrates the main usage case.
 
 - [src/example_corrections.ipynb](src/example_corrections.ipynb)
 - [src/example_Mars.ipynb](src/example_Mars.ipynb)
 - [src/example_coefficients.ipynb](src/example_coefficients.ipynb)
 - [src/ellipticity_of_figure.ipynb](src/ellipticity_of_figure.ipynb)
 
-An example velocity model of Mars, as used by example_mars.ipynb, is in the mars_model directory.
+An example velocity model of Mars, as used by [src/example_Mars.ipynb](src/example_Mars.ipynb), is in [src/mars_model/mars1.npz](src/example_Mars.ipynb).
 
 
 ## License
