@@ -39,10 +39,11 @@ This package is intended to be used in Python
 [-0.7761560510457043]
 ```
 
-For users that do not wish to directly interact with Python, there is a command line wrapper although this is substantially less efficient.
+For users that do not wish to directly interact with Python, there is a command line wrapper for calculating ellipticity correction in [src/ellip](src/ellip). The Python package must be installed before the wrapper can be used.
 
 ```
->>> ./ellipticity_correction.py -d 134 -deg 64 -az 15 -sl 23 -ph P,PcP,PKiKP -mod ak135
+    > ./ellip -d 134 -deg 64 -az 15 -sl 23 -ph P,PcP,PKiKP -mod ak135
+    
 Model: ak135
  Distance    Depth     Phase         Ray Param     Spherical    Ellipticity      Elliptical
    (deg)      (km)     Name          p (s/deg)     Travel       Correction       Travel
