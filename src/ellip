@@ -112,14 +112,14 @@ line2 = "   (deg)      (km)     Name          p (s/deg)     Travel       Correct
 line3 = "                                                   Time (s)         (s)          Time (s)  "
 line4 = "-------------------------------------------------------------------------------------------"
 lines = [
-    f"{arrivals[i].purist_distance:.2f}".rjust(9, " ")
-    + f"{arrivals[i].source_depth:.2f}".rjust(9, " ")
+    f"{arrivals[i].purist_distance:>9.2f}"
+    + f"{arrivals[i].source_depth:>9.2f}"
     + "     "
-    + arrivals[i].name.ljust(14, " ")
-    + f"{arrivals[i].ray_param_sec_degree:.3f}".rjust(9, " ")
-    + f"{arrivals[i].time:.2f}".rjust(13, " ")
-    + f"{corrections[i]:.2f}".rjust(14, " ")
-    + f"{times[i]:.2f}".rjust(16, " ")
+    + f"{arrivals[i].name:<14}"
+    + f"{arrivals[i].ray_param_sec_degree:>9.3f}"
+    + f"{arrivals[i].time:>13.2f}"
+    + f"{corrections[i]:>14.2f}"
+    + f"{times[i]:>16.2f}"
     for i in range(len(arrivals))
 ]
 message0 = "\n".join([line0, line1, line2, line3, line4])
