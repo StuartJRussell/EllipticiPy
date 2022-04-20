@@ -46,12 +46,12 @@ For users that do not wish to directly interact with Python, there is a command 
     
 Model: ak135
  Distance    Depth     Phase         Ray Param     Spherical    Ellipticity      Elliptical
-   (deg)      (km)     Name          p (s/deg)     Travel       Correction       Travel
-                                                   Time (s)         (s)          Time (s)
+   (deg)      (km)     Name          p (s/deg)     Travel       Correction       Travel    
+                                                   Time (s)         (s)          Time (s)  
 -------------------------------------------------------------------------------------------
-     64.0    134.0     P                 6.536       619.05         -0.45          618.61
-     64.0    134.0     PcP                4.11       653.31         -0.48          652.83
-     64.0    134.0     PKiKP             1.307      1020.55         -0.75          1019.8
+    64.00   134.00     P                 6.536       619.05         -0.45          618.61
+    64.00   134.00     PcP               4.110       653.31         -0.48          652.83
+    64.00   134.00     PKiKP             1.307      1020.55         -0.75         1019.80
 ```
 
 ## Examples
