@@ -31,7 +31,7 @@ import sys
 import argparse
 import warnings
 from obspy.taup import TauPyModel
-from src.ellipticity import ellipticity_correction
+from src.ellipticipy import ellipticity_correction
 from src.ellipticity.tools import EARTH_LOD
 
 # Ignore TauP warning

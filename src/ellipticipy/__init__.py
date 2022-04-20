@@ -1,5 +1,5 @@
 """
-Ellipticity toolkit
+EllipticiPy
 ===================
 
 :copyright:
