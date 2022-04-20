@@ -1,4 +1,4 @@
-from ellipticity.tools import ellipticity_coefficients
+from ellipticipy.tools import ellipticity_coefficients
 from obspy.taup import TauPyModel
 import numpy as np
 import pytest

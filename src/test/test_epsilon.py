@@ -1,4 +1,4 @@
-from ellipticity.tools import model_epsilon, get_epsilon
+from ellipticipy.tools import model_epsilon, get_epsilon
 from obspy.taup import TauPyModel
 
 

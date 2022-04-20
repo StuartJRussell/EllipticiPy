@@ -1,4 +1,4 @@
-from ellipticity import ellipticity_correction
+from ellipticipy import ellipticity_correction
 from obspy.taup import TauPyModel
 import pytest
 
