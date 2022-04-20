@@ -1,6 +1,6 @@
 ## About
 
-A python package for the calculation of ellipticity corrections for seismic phases in elliptical planetary models.
+EllipticiPy: a python package for the calculation of ellipticity corrections for seismic phases in elliptical planetary models.
 
 Authors:
 - Stuart Russell
