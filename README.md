@@ -23,7 +23,7 @@ License for this package - standard LGPL license.
 The package can be installed using pip, the same as many python packages:
 
 ```
-pip install ellipticity
+pip install ellipticipy
 ```
 
 This package depends on ObsPy. For information regarding ObsPy please see the relevant documentation: https://docs.obspy.org/
