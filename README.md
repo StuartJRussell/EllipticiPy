@@ -14,9 +14,6 @@ insertpaperhere
 
 Please cite this publication when publishing work that has made use of this package.
 
-## LICENSE
-
-License for this package - standard LGPL license.
 
 ## Installation
 
@@ -58,9 +55,16 @@ Model: ak135
 
 ## Examples
 
-Further examples of code usage in Jupyter Notebook format can be found in src/
+Further examples of code usage in Jupyter Notebook format can be found in [src/](src/). The first of these shows the main usage.
 
-- example\_get\_corrections.ipynb
-- example\_Mars.ipynb
+- [src/example_corrections.ipynb](src/example_corrections.ipynb)
+- [src/example_Mars.ipynb](src/example_Mars.ipynb)
+- [src/example_coefficients.ipynb](src/example_coefficients.ipynb)
+- [src/ellipticity_of_figure.ipynb](src/ellipticity_of_figure.ipynb)
 
-An example velocity model of Mars, as used by example\_mars.ipynb, is in the mars\_model directory.
+An example velocity model of Mars, as used by example_mars.ipynb, is in the mars_model directory.
+
+
+## License
+
+This package is licenced under the GNU Lesser General Public License v3.0.
