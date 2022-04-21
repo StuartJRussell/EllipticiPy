@@ -19,9 +19,9 @@ Functions:
 
 """
 
-__version__ = "0.9"
+__version__ = "0.9.0"
 __author__ = (
-    "Stuart Russell, John F Rudge, Jessica C. E. Irving, Sanne Cottaar"
+    "Stuart Russell, John F. Rudge, Jessica C. E. Irving, Sanne Cottaar"
 )
 
 # Import functions
