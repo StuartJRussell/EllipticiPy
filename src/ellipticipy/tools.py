@@ -121,47 +121,6 @@ def get_epsilon(model, depth):
     return slope * (depth - layer["top_depth"]) + top_eps
 
 
-def evaluate_derivative_below(model, depth, prop):
-    """
-    Depth derivative of material property at bottom of a velocity layer.
-    """
-
-    # Get the appropriate slowness layer
-    layer = model.layers[model.layer_number_below(depth)]
-    return evaluate_derivative_at(layer, prop)
-
-
-def evaluate_derivative_above(model, depth, prop):
-    """
-    Depth derivative of material property at top of a velocity layer.
-    """
-
-    # Get the appropriate slowness layer
-    layer = model.layers[model.layer_number_above(depth)]
-    return evaluate_derivative_at(layer, prop)
-
-
-def evaluate_derivative_at(layer, prop):
-    """
-    Depth derivative of material property in a velocity layer.
-    """
-
-    # Get the velocity gradient from the slowness layer
-    # Velocity gradient is constant in any slowness layer
-    thick = layer["bot_depth"] - layer["top_depth"]
-    prop = prop.lower()
-    if prop == "p":
-        slope = (layer["bot_p_velocity"] - layer["top_p_velocity"]) / thick
-        return slope
-    if prop == "s":
-        slope = (layer["bot_s_velocity"] - layer["top_s_velocity"]) / thick
-        return slope
-    if prop in "rd":
-        slope = (layer["bot_density"] - layer["top_density"]) / thick
-        return slope
-    raise ValueError("Unknown material property, use p, s, or d.")
-
-
 def weighted_alp2(m, theta):
     """
     The weighted degree 2 associated Legendre polynomial.
@@ -180,8 +139,7 @@ def weighted_alp2(m, theta):
 
     # Pre-factor for polynomial - Schmidt semi-normalisation
     norm = np.sqrt(
-        (2 - kronecker_0m)
-        * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
+        (2 - kronecker_0m) * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
     )
 
     # Return polynomial of degree 2 and order m
@@ -218,16 +176,12 @@ def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
     [[-0.9322726492103899, -0.6887388908599743, -0.8823671774932877]]
     """
 
-
     # If model not specified then obtain via Arrivals
     if model is None:
         model = arrivals.model
-        
+
     # Get coefficients for each arrival individually
-    return [
-        individual_ellipticity_coefficients(arr, model, lod)
-        for arr in arrivals
-    ]
+    return [individual_ellipticity_coefficients(arr, model, lod) for arr in arrivals]
 
 
 def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
@@ -284,9 +238,7 @@ def split_ray_path(arrival, model):
 
     # Split ray paths, including start and end points
     splitted = np.split(full_path, idx)
-    dpaths = [
-        np.append(s, splitted[i + 1][0]) for i, s in enumerate(splitted[:-1])
-    ]
+    dpaths = [np.append(s, splitted[i + 1][0]) for i, s in enumerate(splitted[:-1])]
 
     # Classify the waves - P or S
     dwaves = [classify_path(path, model) for path in dpaths]
@@ -412,11 +364,6 @@ def integral_coefficients(arrival, model):
         v[cond] = v_mod.evaluate_below(depth[cond], wave)
         v[~cond] = v_mod.evaluate_above(max_depth, wave)
 
-        # Gradient of v wrt r in s^-1
-        dvdr = np.zeros_like(depth)
-        dvdr[cond] = -evaluate_derivative_below(v_mod, depth[cond], wave)
-        dvdr[~cond] = -evaluate_derivative_above(v_mod, max_depth, wave)
-
         # eta in s
         eta = radius / v
 
@@ -433,13 +380,28 @@ def integral_coefficients(arrival, model):
         y = eta**2 - arrival.ray_param**2
         vertical_slowness = np.sqrt(y * (y > 0))  # in s
 
+        # the Bullen (1963) quantity d log(r)/d log(eta)
+        r_top = radius[1:]
+        r_bot = radius[:-1]
+
+        v_top = v[1:]
+        v_bot = v[:-1]
+
+        with np.errstate(divide="ignore"):
+            # centre of planet log(0.0) will evaluate as -np.inf, which is ok, don't warn
+            dlogr = np.log(r_top) - np.log(r_bot)
+        dlogv = np.log(v_top) - np.log(v_bot)
+        dlogr_dlogeta = 1.0 / (1.0 - dlogv / dlogr)
+
         # Do the integration by trapezoidal rule
         def integration(m):
-            integrand = (eta * dvdr / (1.0 - eta * dvdr)) * epsilon * lam[m]
+            integrand = epsilon * lam[m]
             top = integrand[1:]
             bot = integrand[:-1]
+
             delta = abs(vertical_slowness[1:] - vertical_slowness[:-1])
-            return np.sum(0.5 * (top + bot) * delta)
+
+            return np.sum(0.5 * (top + bot) * (dlogr_dlogeta - 1.0) * delta)
 
         sigmas.append([integration(m) for m in [0, 1, 2]])
 
@@ -492,9 +454,7 @@ def discontinuity_contribution(points, phase, model):
     lam = [-(2.0 / 3.0) * weighted_alp2(m, distance) for m in [0, 1, 2]]
 
     # Coefficients for this discontinuity
-    sigma = np.array(
-        [-sign * vertical_slowness * epsilon * lam[m] for m in [0, 1, 2]]
-    )
+    sigma = np.array([-sign * vertical_slowness * epsilon * lam[m] for m in [0, 1, 2]])
 
     return sigma
 
