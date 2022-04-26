@@ -84,6 +84,7 @@ def model_epsilon(model, lod=EARTH_LOD):
     epsilon = np.insert(epsilon, 0, epsilon[0])  # add a centre of planet value
     v_mod.top_epsilon = epsilon[::-1][:-1]
     v_mod.bot_epsilon = epsilon[::-1][1:]
+    v_mod.lod = lod
 
 
 def get_epsilon(model, depth):
@@ -205,7 +206,7 @@ def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
         raise TypeError("Velocity model not correct type")
 
     # Calculate epsilon values if they don't already exist
-    if not hasattr(model.s_mod.v_mod, "top_epsilon"):
+    if not hasattr(model.s_mod.v_mod, "top_epsilon") or model.s_mod.v_mod.lod != lod:
         model_epsilon(model, lod)
 
     # Coefficients from continuous ray path
