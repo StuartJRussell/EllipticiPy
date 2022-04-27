@@ -381,6 +381,11 @@ def integral_coefficients(arrival, model):
         y = eta**2 - arrival.ray_param**2
         vertical_slowness = np.sqrt(y * (y > 0))  # in s
 
+        # Make velocities for bottoming rays consistent
+        if arrival.ray_param > 0.0:
+            is_bottoming = vertical_slowness < 1e-9
+            v[is_bottoming] = radius[is_bottoming] / arrival.ray_param
+
         # the Bullen (1963) quantity d log(r)/d log(eta)
         r_top = radius[1:]
         r_bot = radius[:-1]
