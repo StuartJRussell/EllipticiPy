@@ -4,8 +4,8 @@ A python package for the calculation of ellipticity corrections for seismic phas
 
 Authors:
 - Stuart Russell
-- Jessica C. E. Irving
 - John F. Rudge
+- Jessica C. E. Irving
 - Sanne Cottaar
 
 The workings of this package are described in:
@@ -59,11 +59,8 @@ Distance   Depth   Phase        Ray Param   Spherical   Ellipticity   Elliptical
 Further examples of code usage in Jupyter Notebook format can be found in [src/](src/). The first of these demonstrates the main usage case.
 
 - [src/example_corrections.ipynb](src/example_corrections.ipynb)
-- [src/example_Mars.ipynb](src/example_Mars.ipynb)
 - [src/example_coefficients.ipynb](src/example_coefficients.ipynb)
 - [src/ellipticity_of_figure.ipynb](src/ellipticity_of_figure.ipynb)
-
-An example velocity model of Mars, as used by [src/example_Mars.ipynb](src/example_Mars.ipynb), is in [src/mars_model/mars1.npz](src/mars_model/mars1.npz).
 
 
 ## License
