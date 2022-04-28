@@ -36,7 +36,7 @@ This package is intended to be used in Python:
 >>> arrivals = model.get_ray_paths(source_depth_in_km = 124,
     distance_in_degree = 65, phase_list = ['pPKiKP'])
 >>> ellipticity_correction(arrivals, azimuth = 39, source_latitude = 45)
-[-0.7760469283015952]
+[-0.7731978967098823]
 ```
 
 For users that do not wish to directly interact with Python, there is a command line wrapper for calculating ellipticity corrections in [src/ellip](src/ellip). The Python package must be installed before the wrapper can be used.
@@ -49,7 +49,7 @@ Distance   Depth   Phase        Ray Param   Spherical   Ellipticity   Elliptical
   (deg)     (km)   Name         p (s/deg)   Travel      Correction    Travel    
                                             Time (s)        (s)       Time (s)  
 --------------------------------------------------------------------------------
-   64.00   134.0   P                6.536     619.05        -0.45       618.61
+   64.00   134.0   P                6.536     619.05        -0.45       618.60
    64.00   134.0   PcP              4.110     653.31        -0.48       652.83
    64.00   134.0   PKiKP            1.307    1020.55        -0.75      1019.80    
 ```

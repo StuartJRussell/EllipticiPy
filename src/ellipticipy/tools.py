@@ -174,7 +174,7 @@ def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
     >>> arrivals = model.get_ray_paths(source_depth_in_km = 124,
         distance_in_degree = 65, phase_list = ['pPKiKP'])
     >>> ellipticity_coefficients(arrivals)
-    [[-0.9322726492103899, -0.6887388908599743, -0.8823671774932877]]
+    [[-0.9293229194820186, -0.6859308201378412, -0.8799047487163734]]
     """
 
     # If model not specified then obtain via Arrivals

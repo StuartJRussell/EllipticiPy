@@ -38,7 +38,7 @@ def ellipticity_correction(arrivals, azimuth, source_latitude, model=None, lod=E
     >>> arrivals = model.get_ray_paths(source_depth_in_km = 124,
         distance_in_degree = 65, phase_list = ['pPKiKP'])
     >>> ellipticity_correction(arrivals, azimuth = 39, source_latitude = 45)
-    [-0.7760469283015952]
+    [-0.7731978967098823]
     """
     
     # Get model from arrivals object if model is None
