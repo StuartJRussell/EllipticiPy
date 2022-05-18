@@ -8,9 +8,9 @@ Authors:
 - Jessica C. E. Irving
 - Sanne Cottaar
 
-The workings of this package are described in:
+The workings of this package are described in the main paper. A preprint on Arxiv can be found at:
 
-insertpaperhere
+https://eur03.safelinks.protection.outlook.com/?url=http%3A%2F%2Farxiv.org%2Fabs%2F2205.08229&amp;data=05%7C01%7Csr895%40universityofcambridgecloud.onmicrosoft.com%7C04f837ff11af443ffff508da3867a454%7C49a50445bdfa4b79ade3547b4f3986e9%7C0%7C0%7C637884315154124748%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C2000%7C%7C%7C&amp;sdata=1ElZ1cP7h9BvKWCWPjbAVnpjthTiCAsf3IStGovlDgs%3D&amp;reserved=0
 
 Please cite this publication when publishing work that has made use of this package.
 
