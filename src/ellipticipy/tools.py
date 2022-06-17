@@ -396,11 +396,14 @@ def integral_coefficients(arrival, model):
         v_top = v[1:]
         v_bot = v[:-1]
 
-        with np.errstate(divide="ignore"):
+        with np.errstate(divide="ignore", invalid="ignore"):
             # centre of planet log(0.0) will evaluate as -np.inf, which is ok, don't warn
             dlogr = np.log(r_top) - np.log(r_bot)
-        dlogv = np.log(v_top) - np.log(v_bot)
-        dlogr_dlogeta = 1.0 / (1.0 - dlogv / dlogr)
+            dlogv = np.log(v_top) - np.log(v_bot)
+            dlogr_dlogeta = 1.0 / (1.0 - dlogv / dlogr)
+
+        # remove nans caused by a zero thickness layer
+        dlogr_dlogeta[r_top == r_bot] = 1.0
 
         # Do the integration by trapezoidal rule
         def integration(m):
