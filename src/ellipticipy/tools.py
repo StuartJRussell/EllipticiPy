@@ -533,6 +533,9 @@ def table_ellipticity_coefficients(phase_name, model, source_depth_in_km=0.0,
     :type receiver_depth_in_km: float
     :param lod: length of day in seconds. Defaults to Earth value
     :type lod: float
+
+    :returns: Table of ellipticity coefficients
+    :rtype: dict
     """
 
     if isinstance(model, TauPyModel):
