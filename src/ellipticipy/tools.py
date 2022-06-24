@@ -188,19 +188,23 @@ def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
     return [individual_ellipticity_coefficients(arr, model, lod) for arr in arrivals]
 
 
-def individual_ellipticity_coefficients(arrival, model, lod=EARTH_LOD):
+def individual_ellipticity_coefficients(arrival, model=None, lod=EARTH_LOD):
     """
     Ellipticity coefficients for a single ray path.
 
     :param arrival: TauP Arrival object with ray path calculated.
     :type arrival: :class:`obspy.taup.helper_classes.Arrival`
-    :param model: Tau model used to calculate the arrival
+    :param model: optional, Tau model used to calculate the arrival
     :type model: :class:`obspy.taup.tau_model.TauModel`
     :param lod: optional, length of day in seconds. Defaults to Earth value
     :type lod: float
     :returns: list of three floats, ellipticity coefficients
     :rtype: list
     """
+
+    # If not given model, get from arrival object
+    if model is None:
+        model = arrival.phase.tau_model
 
     # Ensure that model is TauModel
     if isinstance(model, TauPyModel):
@@ -518,8 +522,9 @@ def correction_from_coefficients(coefficients, azimuth, source_latitude):
     )
 
 
-def table_ellipticity_coefficients(phase_list, model, source_depth_in_km=0.0,
-                                   receiver_depth_in_km=0.0, lod=EARTH_LOD):
+def table_ellipticity_coefficients(
+    phase_list, model, source_depth_in_km=0.0, receiver_depth_in_km=0.0, lod=EARTH_LOD
+):
     """
     Produce a table of ellipticity coefficients for a given phase.
 
@@ -556,20 +561,29 @@ def table_ellipticity_coefficients(phase_list, model, source_depth_in_km=0.0,
 
         ellip_coeffs = np.zeros((len(ph.ray_param), 3))
         for idx, p in enumerate(ph.ray_param):
-            arrival = Arrival(ph, 0.0, ph.time[idx],
-                              ph.dist[idx], ph.ray_param[idx],
-                              idx, ph.name, ph.purist_name,
-                              source_depth_in_km,
-                              receiver_depth_in_km)
+            arrival = Arrival(
+                ph,
+                0.0,
+                ph.time[idx],
+                ph.dist[idx],
+                ph.ray_param[idx],
+                idx,
+                ph.name,
+                ph.purist_name,
+                source_depth_in_km,
+                receiver_depth_in_km,
+            )
             arrival = ph.calc_path_from_arrival(arrival)
-            ellip = individual_ellipticity_coefficients(arrival, ph.tau_model, lod)
+            ellip = individual_ellipticity_coefficients(arrival, lod=lod)
             ellip_coeffs[idx, :] = ellip
 
-        tables[phase_name] = {'ray_param': ph.ray_param,
-                              'degrees': (180.0/np.pi)*ph.dist,
-                              'dist': ph.dist,
-                              'time': ph.time,
-                              'ellip_coeffs': ellip_coeffs}
+        tables[phase_name] = {
+            "ray_param": ph.ray_param,
+            "degrees": (180.0 / np.pi) * ph.dist,
+            "dist": ph.dist,
+            "time": ph.time,
+            "ellip_coeffs": ellip_coeffs,
+        }
 
     if isinstance(phase_list, str) and len(tables) == 1:
         return tables[phase_name]
