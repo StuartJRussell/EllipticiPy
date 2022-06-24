@@ -160,12 +160,13 @@ def ellipticity_coefficients(arrivals, lod=EARTH_LOD):
     """
     Ellipticity coefficients for a set of arrivals.
 
-    :param arrivals: TauP Arrivals object with ray paths calculated.
-    :type arrivals: :class:`obspy.taup.tau.Arrivals`
+    :param arrivals: TauP Arrival or Arrivals object with ray paths calculated.
+    :type arrivals: :class:`obspy.taup.tau.Arrivals` or
+                    :class:`obspy.taup.tau.Arrival`
     :param lod: optional, length of day in seconds. Defaults to Earth value
     :type lod: float
     :returns: list of lists of three floats, ellipticity coefficients
-    :rtype: list[list]
+    :rtype: list[list] for Arrivals, list for Arrival
 
     Usage:
 
@@ -177,8 +178,8 @@ def ellipticity_coefficients(arrivals, lod=EARTH_LOD):
     >>> ellipticity_coefficients(arrivals)
     [[-0.9293229194820186, -0.6859308201378412, -0.8799047487163734]]
     """
-
-    # Get coefficients for each arrival individually
+    if isinstance(arrivals, Arrival):
+        return individual_ellipticity_coefficients(arrivals, lod=lod)
     return [individual_ellipticity_coefficients(arr, lod=lod) for arr in arrivals]
 
 
