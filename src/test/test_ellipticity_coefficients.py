@@ -1,4 +1,4 @@
-from ellipticipy.tools import ellipticity_coefficients
+from ellipticipy.tools import ellipticity_coefficients, table_ellipticity_coefficients
 from obspy.taup import TauPyModel
 import numpy as np
 import pytest
@@ -40,3 +40,12 @@ def test_ellipticity_coefficients(
     print(phase, expected_sigma, calculated_sigma)
 
     assert np.all(abs(diff) < tol)
+
+
+def test_table_ellipticity_coefficients():
+    model = TauPyModel("ak135")
+    table = table_ellipticity_coefficients("SKKS", model, source_depth_in_km=200.0)
+    test_coeff = table["ellip_coeffs"][-1]
+    expected_coeff = np.array([-1.26, 1.57, -2.08])
+
+    assert np.allclose(test_coeff, expected_coeff, atol=2e-2)
