@@ -12,6 +12,7 @@ from obspy.taup.tau import TauModel
 from obspy.taup.seismic_phase import SeismicPhase
 from obspy.taup.helper_classes import Arrival
 from obspy.taup.utils import parse_phase_list
+from obspy.geodetics.base import gps2dist_azimuth
 
 # Constants
 EARTH_LOD = 86164.0905  # s, length of day of Earth
@@ -495,6 +496,13 @@ def correction_from_coefficients(coefficients, azimuth, source_latitude):
     """
     Ellipticity correction given the ellipticity coefficients.
     """
+    # Enforce that event latitude must be in range -90 to 90 degrees
+    if not -90 <= source_latitude <= 90:
+        raise ValueError("Source latitude must be in range -90 to 90 degrees")
+
+    # Enforce that azimuth must be in range 0 to 360 degrees
+    if not 0 <= azimuth <= 360:
+        raise ValueError("Azimuth must be in range 0 to 360 degrees")
 
     # Convert latitude to colatitude
     colatitude = np.radians(90 - source_latitude)
@@ -506,6 +514,24 @@ def correction_from_coefficients(coefficients, azimuth, source_latitude):
         coefficients[m] * weighted_alp2(m, colatitude) * np.cos(m * azimuth)
         for m in [0, 1, 2]
     )
+
+
+def azimuth_source_latitude_from_geo_arrival(arrival):
+    """
+    For an arrival with a taup.TimeDistGeo path calculate azimuth and source latitude.
+    """
+    if "lat" not in arrival.path.dtype.names:
+        raise ValueError("Unable to determine source latitude and azimuth from Arrival")
+
+    source_latitude = arrival.path["lat"][0]
+    source_longitude = arrival.path["lon"][0]
+    receiver_latitude = arrival.path["lat"][-1]
+    receiver_longitude = arrival.path["lon"][-1]
+
+    azimuth = gps2dist_azimuth(
+        source_latitude, source_longitude, receiver_latitude, receiver_longitude
+    )[1]
+    return azimuth, source_latitude
 
 
 def table_ellipticity_coefficients(
