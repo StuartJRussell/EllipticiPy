@@ -1,8 +1,7 @@
 # Copyright (C) 2022 Stuart Russell
 """
-This file contains the functions to support the calculation of ellipticity
-corrections. All functions in this file are called by the main functions
-in the main file.
+This module contains functions to support the calculation of ellipticity
+corrections. These functions are called by the functions in the main module.
 """
 
 import numpy as np

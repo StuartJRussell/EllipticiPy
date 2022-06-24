@@ -11,7 +11,7 @@ EllipticiPy
 A Python package for the calculation of ellipticity corrections for seismic phases in planetary models.
 
 When publishing work produced with this package please cite the following publication:
-INSERT PAPER HERE
+https://arxiv.org/abs/2205.08229
 
 
 Functions:
@@ -19,10 +19,8 @@ Functions:
 
 """
 
-__version__ = "0.9.0"
-__author__ = (
-    "Stuart Russell, John F. Rudge, Jessica C. E. Irving, Sanne Cottaar"
-)
+__version__ = "0.9.1"
+__author__ = "Stuart Russell, John F. Rudge, Jessica C. E. Irving, Sanne Cottaar"
 
 # Import functions
 from .main import ellipticity_correction

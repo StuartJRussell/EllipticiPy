@@ -1,6 +1,6 @@
 # Copyright (C) 2022 Stuart Russell
 """
-This file contains the necessary function for a user to calculate an
+This module contains the necessary function for a user to calculate an
 ellipticity correction for a seismic ray path in a given model.
 """
 
@@ -54,10 +54,7 @@ def ellipticity_correction(arrivals, azimuth, source_latitude, lod=EARTH_LOD):
     # Calculate time
     if isinstance(arrivals, Arrival):
         return correction_from_coefficients(sigma, azimuth, source_latitude)
-    
-    dt = [
-        correction_from_coefficients(sig, azimuth, source_latitude)
-        for sig in sigma
-    ]
 
-    return dt
+    return [
+        correction_from_coefficients(sig, azimuth, source_latitude) for sig in sigma
+    ]
