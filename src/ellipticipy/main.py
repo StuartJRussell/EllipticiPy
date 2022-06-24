@@ -12,7 +12,7 @@ from .tools import (
 )
 
 
-def ellipticity_correction(arrivals, azimuth, source_latitude, model=None, lod=EARTH_LOD):
+def ellipticity_correction(arrivals, azimuth, source_latitude, lod=EARTH_LOD):
     """
     Ellipticity correction to be added to a travel time.
 
@@ -22,9 +22,6 @@ def ellipticity_correction(arrivals, azimuth, source_latitude, model=None, lod=E
     :type azimuth: float
     :param source_latitude: source latitude in degrees
     :type source_latitude: float
-    :param model: optional, model used to calculate the arrivals
-    :type model: :class:`obspy.taup.tau.TauPyModel` or
-                 :class:`obspy.taup.tau_model.TauModel`
     :param lod: optional, length of day in seconds. Defaults to Earth value
     :type lod: float
     :returns: ellipticity correction in seconds for each arrival
@@ -40,12 +37,6 @@ def ellipticity_correction(arrivals, azimuth, source_latitude, model=None, lod=E
     >>> ellipticity_correction(arrivals, azimuth = 39, source_latitude = 45)
     [-0.7731978967098823]
     """
-    
-    # Get model from arrivals object if model is None
-    if model is None:
-        model = arrivals.model
-    if isinstance(model, TauPyModel):
-        model = model.model
 
     # Enforce that event latitude must be in range -90 to 90 degrees
     if not -90 <= source_latitude <= 90:
@@ -56,7 +47,7 @@ def ellipticity_correction(arrivals, azimuth, source_latitude, model=None, lod=E
         raise ValueError("Azimuth must be in range 0 to 360 degrees")
 
     # Calculate the ellipticity coefficients
-    sigma = ellipticity_coefficients(arrivals, model, lod)
+    sigma = ellipticity_coefficients(arrivals, lod=lod)
 
     # Calculate time
     dt = [

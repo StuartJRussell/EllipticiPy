@@ -156,14 +156,12 @@ def weighted_alp2(m, theta):
     raise ValueError("Invalid value of m")
 
 
-def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
+def ellipticity_coefficients(arrivals, lod=EARTH_LOD):
     """
     Ellipticity coefficients for a set of arrivals.
 
     :param arrivals: TauP Arrivals object with ray paths calculated.
     :type arrivals: :class:`obspy.taup.tau.Arrivals`
-    :param model: optional, model used to calculate the arrivals
-    :type model: :class:`obspy.taup.tau_model.TauModel`
     :param lod: optional, length of day in seconds. Defaults to Earth value
     :type lod: float
     :returns: list of lists of three floats, ellipticity coefficients
@@ -180,47 +178,32 @@ def ellipticity_coefficients(arrivals, model=None, lod=EARTH_LOD):
     [[-0.9293229194820186, -0.6859308201378412, -0.8799047487163734]]
     """
 
-    # If model not specified then obtain via Arrivals
-    if model is None:
-        model = arrivals.model
-
     # Get coefficients for each arrival individually
-    return [individual_ellipticity_coefficients(arr, model, lod) for arr in arrivals]
+    return [individual_ellipticity_coefficients(arr, lod=lod) for arr in arrivals]
 
 
-def individual_ellipticity_coefficients(arrival, model=None, lod=EARTH_LOD):
+def individual_ellipticity_coefficients(arrival, lod=EARTH_LOD):
     """
     Ellipticity coefficients for a single ray path.
 
     :param arrival: TauP Arrival object with ray path calculated.
     :type arrival: :class:`obspy.taup.helper_classes.Arrival`
-    :param model: optional, Tau model used to calculate the arrival
-    :type model: :class:`obspy.taup.tau_model.TauModel`
     :param lod: optional, length of day in seconds. Defaults to Earth value
     :type lod: float
     :returns: list of three floats, ellipticity coefficients
     :rtype: list
     """
 
-    # If not given model, get from arrival object
-    if model is None:
-        model = arrival.phase.tau_model
-
-    # Ensure that model is TauModel
-    if isinstance(model, TauPyModel):
-        model = model.model
-    if not isinstance(model, TauModel):
-        raise TypeError("Velocity model not correct type")
-
     # Calculate epsilon values if they don't already exist
+    model = arrival.phase.tau_model
     if not hasattr(model.s_mod.v_mod, "top_epsilon") or model.s_mod.v_mod.lod != lod:
         model_epsilon(model, lod)
 
     # Coefficients from continuous ray path
-    ray_sigma = integral_coefficients(arrival, model)
+    ray_sigma = integral_coefficients(arrival)
 
     # Coefficients from discontinuities
-    disc_sigma = discontinuity_coefficients(arrival, model)
+    disc_sigma = discontinuity_coefficients(arrival)
 
     # Sum the contribution from the ray path and the discontinuities
     # to get final coefficients
@@ -229,10 +212,11 @@ def individual_ellipticity_coefficients(arrival, model=None, lod=EARTH_LOD):
     return sigma
 
 
-def split_ray_path(arrival, model):
+def split_ray_path(arrival):
     """
     Split and label ray path according to type of wave.
     """
+    model = arrival.phase.tau_model
 
     # Get discontinuity depths in the model in km
     discs = model.s_mod.v_mod.get_discontinuity_depths()[:-1]
@@ -346,13 +330,14 @@ def classify_path(path, model):
     return "s"
 
 
-def integral_coefficients(arrival, model):
+def integral_coefficients(arrival):
     """
     Ellipticity coefficients due to integral along ray path.
     """
+    model = arrival.phase.tau_model
 
     # Split the ray path
-    paths, waves = split_ray_path(arrival, model)
+    paths, waves = split_ray_path(arrival)
 
     # Loop through path segments
     sigmas = []
@@ -478,13 +463,14 @@ def discontinuity_contribution(points, phase, model):
     return sigma
 
 
-def discontinuity_coefficients(arrival, model):
+def discontinuity_coefficients(arrival):
     """
     Ellipticity coefficients due to all discontinuities.
     """
+    model = arrival.phase.tau_model
 
     # Split the ray path
-    paths, waves = split_ray_path(arrival, model)
+    paths, waves = split_ray_path(arrival)
 
     # Loop through path segments
     sigmas = []
