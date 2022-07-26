@@ -10,7 +10,7 @@ Before using the replacement tables with ellip, the direct access tables must be
 ./direct < ELCOR_replacement.dat
 ```
 
-This command wil update elcordir.tbl and ellip will now use the updated tables.
+This command will update elcordir.tbl and ellip will now use the updated tables.
 
 ## Citing
 
