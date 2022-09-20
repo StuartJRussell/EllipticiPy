@@ -11,8 +11,7 @@ EllipticiPy
 A Python package for the calculation of ellipticity corrections for seismic phases in planetary models.
 
 When publishing work produced with this package please cite the following publication:
-https://arxiv.org/abs/2205.08229
-
+https://doi.org/10.1093/gji/ggac315
 
 Functions:
     ellipticity_correction - Calculates ellipticity correction for a given ray path and velocity model

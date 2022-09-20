@@ -8,9 +8,10 @@ Authors:
 - Jessica C. E. Irving
 - Sanne Cottaar
 
-The workings of this package are described in the main paper. A preprint on Arxiv can be found at:
+The workings of this package are described in the main paper:
 
-https://arxiv.org/abs/2205.08229
+Russell, S., Rudge, J., Irving, J. and Cottaar, S., 2022. A re-examination of ellipticity corrections for seismic phases. Geophysical Journal International, 231(3), pp.2095-2101.
+https://doi.org/10.1093/gji/ggac315
 
 Please cite this publication when publishing work that has made use of this package.
 
