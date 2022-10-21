@@ -18,7 +18,7 @@ Functions:
 
 """
 
-__version__ = "0.9.1"
+__version__ = "1.0.0"
 __author__ = "Stuart Russell, John F. Rudge, Jessica C. E. Irving, Sanne Cottaar"
 
 # Import functions
