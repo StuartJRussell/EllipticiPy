@@ -4,8 +4,9 @@ This module contains functions to support the calculation of ellipticity
 corrections. These functions are called by the functions in the main module.
 """
 
+import math
 import numpy as np
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 
 from obspy.taup import TauPyModel
 from obspy.taup.tau import TauModel
@@ -78,7 +79,7 @@ def model_epsilon(model, lod=EARTH_LOD):
     epsilona = (5 * ha) / (2 * radau[-1] + 4)
 
     # Solve the differential equation
-    epsilon = np.exp(cumtrapz(radau / top_radius, x=top_radius, initial=0.0))
+    epsilon = np.exp(cumulative_trapezoid(radau / top_radius, x=top_radius, initial=0.0))
     epsilon = epsilona * epsilon / epsilon[-1]
 
     # Output as model attributes
@@ -143,7 +144,7 @@ def weighted_alp2(m, theta):
 
     # Pre-factor for polynomial - Schmidt semi-normalisation
     norm = np.sqrt(
-        (2 - kronecker_0m) * (np.math.factorial(2 - m) / np.math.factorial(2 + m))
+        (2 - kronecker_0m) * (math.factorial(2 - m) / math.factorial(2 + m))
     )
 
     # Return polynomial of degree 2 and order m
